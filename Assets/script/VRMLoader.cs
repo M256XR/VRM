@@ -12,7 +12,6 @@ public class VRMLoaderV2 : MonoBehaviour
     [SerializeField] private Text statusText;
 
     private const string LOG_FILE = "vrm_loader_v2.log";
-
     private GameObject currentVRM;
     private VRMBlendShapeProxy blendShapeProxy;
     private BackgroundManagerV2 backgroundManager;
@@ -41,6 +40,7 @@ public class VRMLoaderV2 : MonoBehaviour
             mainCamera.transform.rotation = Quaternion.identity;
             DebugLogger.Log(LOG_FILE, "Camera fixed at origin (0,0,0)");
         }
+        ApplyWallpaperRenderScale();
 
         backgroundManager = new BackgroundManagerV2(mainCamera);
 
@@ -138,6 +138,12 @@ public class VRMLoaderV2 : MonoBehaviour
             statusText.text = message;
         }
         DebugLogger.Log(LOG_FILE, $"Status: {message}");
+    }
+
+    private void ApplyWallpaperRenderScale()
+    {
+        ScalableBufferManager.ResizeBuffers(1.0f, 1.0f);
+        DebugLogger.Log(LOG_FILE, $"Wallpaper render scale applied: targetFrameRate={Application.targetFrameRate} vSyncCount={QualitySettings.vSyncCount} renderScale={ScalableBufferManager.widthScaleFactor:F2}x{ScalableBufferManager.heightScaleFactor:F2}");
     }
 
     public void SetBlendShape(BlendShapePreset preset, float value)

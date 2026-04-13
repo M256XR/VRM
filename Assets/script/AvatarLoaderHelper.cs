@@ -285,10 +285,11 @@ public static class AvatarLoaderHelper
                 string shaderName = material.shader.name;
                 if (shadersByName.TryGetValue(shaderName, out Shader bundleShader))
                 {
-                    if (material.shader != bundleShader)
+                    Shader preferredShader = ResolvePreferredShader(shaderName, bundleShader);
+                    if (preferredShader != null && material.shader != preferredShader)
                     {
-                        DebugLogger.Log(LOG_FILE, $"Rebinding material shader to bundle shader: {material.name} {shaderName}");
-                        AssignShaderPreservingMaterialState(material, bundleShader);
+                        DebugLogger.Log(LOG_FILE, $"Rebinding material shader: {material.name} {shaderName} -> {preferredShader.name} supported={preferredShader.isSupported}");
+                        AssignShaderPreservingMaterialState(material, preferredShader);
                         reboundCount++;
                     }
                 }
@@ -301,6 +302,19 @@ public static class AvatarLoaderHelper
         }
 
         DebugLogger.Log(LOG_FILE, $"Bundle shader rebinding complete: rebound={reboundCount} missingShaderNames={missingCount}");
+    }
+
+    private static Shader ResolvePreferredShader(string shaderName, Shader bundleShader)
+    {
+#if UNITY_EDITOR
+        Shader editorShader = Shader.Find(shaderName);
+        if (editorShader != null && editorShader.isSupported)
+        {
+            DebugLogger.Log(LOG_FILE, $"Editor shader preferred: {shaderName} bundleSupported={(bundleShader != null && bundleShader.isSupported)} editorSupported={editorShader.isSupported}");
+            return editorShader;
+        }
+#endif
+        return bundleShader;
     }
 
     private static void AssignShaderPreservingMaterialState(Material material, Shader shader)
