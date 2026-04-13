@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="vrm_background_fit_modes">
+        <item>Fit</item>
+        <item>Fill</item>
+        <item>Stretch</item>
+        <item>Custom</item>
+    </string-array>
+</resources>

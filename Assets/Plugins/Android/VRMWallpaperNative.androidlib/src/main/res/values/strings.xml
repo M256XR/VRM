@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="vrm_settings_title">VRM Wallpaper Settings</string>
+    <string name="vrm_section_vrm">VRM model</string>
+    <string name="vrm_section_background">Background</string>
+    <string name="vrm_section_background_color">Background color</string>
+    <string name="vrm_section_image_adjustment">Image adjustment</string>
+    <string name="vrm_section_camera">Camera</string>
+
+    <string name="vrm_button_set_wallpaper">Set live wallpaper</string>
+    <string name="vrm_button_reload_wallpaper">Reload wallpaper</string>
+    <string name="vrm_button_open_preview">Open preview</string>
+    <string name="vrm_button_pick_vrm">Choose VRM file</string>
+    <string name="vrm_button_pick_image">Choose background image</string>
+    <string name="vrm_button_use_solid">Use solid background</string>
+    <string name="vrm_button_reset_adjustment">Reset image adjustment</string>
+
+    <string name="vrm_wallpaper_status_active">Wallpaper is active</string>
+    <string name="vrm_wallpaper_status_inactive">Wallpaper is not active yet</string>
+    <string name="vrm_no_vrm_selected">No VRM selected</string>
+    <string name="vrm_no_image_selected">No background image selected</string>
+    <string name="vrm_solid_background_mode">Solid color background</string>
+    <string name="vrm_image_background_mode">Image background</string>
+
+    <string name="vrm_label_red">Red</string>
+    <string name="vrm_label_green">Green</string>
+    <string name="vrm_label_blue">Blue</string>
+    <string name="vrm_label_fit_mode">Fit mode</string>
+    <string name="vrm_label_offset_x">Offset X</string>
+    <string name="vrm_label_offset_y">Offset Y</string>
+    <string name="vrm_label_scale">Scale</string>
+    <string name="vrm_label_distance">Distance</string>
+    <string name="vrm_label_height">Height</string>
+    <string name="vrm_label_angle">Angle</string>
+    <string name="vrm_angle_default_value">0 deg</string>
+    <string name="vrm_angle_value_format">%1$d deg</string>
+
+    <string name="vrm_settings_footer">Changes are saved immediately. Reload wallpaper after changing files or tuning the camera and background.</string>
+    <string name="vrm_saved_vrm">VRM file saved</string>
+    <string name="vrm_saved_image">Background image saved</string>
+    <string name="vrm_saved_solid_background">Solid background selected</string>
+    <string name="vrm_saved_image_adjustment_reset">Image adjustment reset</string>
+    <string name="vrm_wallpaper_reloaded">Wallpaper reload requested</string>
+
+    <string name="vrm_error_open_failed">Could not open the selected file</string>
+    <string name="vrm_error_save_failed">Could not save the selected file</string>
+    <string name="vrm_error_wallpaper_picker">Could not open the wallpaper picker</string>
+    <string name="vrm_error_wallpaper_not_active">Set this wallpaper first</string>
+
+    <string name="vrm_wallpaper_description">VRM live wallpaper</string>
+</resources>

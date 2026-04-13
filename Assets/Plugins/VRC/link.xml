@@ -1,0 +1,4 @@
+<linker>
+    <assembly fullname="VRC.SDK3.Dynamics.PhysBone" preserve="all"/>
+    <assembly fullname="VRC.Dynamics" preserve="all"/>
+</linker>

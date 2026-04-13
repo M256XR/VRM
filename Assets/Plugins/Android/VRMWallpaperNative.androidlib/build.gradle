@@ -1,0 +1,47 @@
+apply plugin: 'com.android.library'
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    compileOnly files("${rootDir}/unityLibrary/libs/unity-classes.jar")
+}
+
+def unityProp = { String key, Object fallback ->
+    if (project.hasProperty(key)) {
+        return project.property(key)
+    }
+    if (rootProject.hasProperty(key)) {
+        return rootProject.property(key)
+    }
+    return fallback
+}
+
+android {
+    namespace "com.oreoreooooooo.VRM"
+    compileSdk unityProp("unity.compileSdkVersion", 33) as int
+    buildToolsVersion = unityProp("unity.buildToolsVersion", "32.0.0").toString()
+
+    buildFeatures {
+        buildConfig false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.valueOf(unityProp("unity.javaCompatabilityVersion", "VERSION_11").toString())
+        targetCompatibility JavaVersion.valueOf(unityProp("unity.javaCompatabilityVersion", "VERSION_11").toString())
+    }
+
+    defaultConfig {
+        minSdk unityProp("unity.minSdkVersion", 24) as int
+        targetSdk unityProp("unity.targetSdkVersion", 33) as int
+        ndk {
+            abiFilters.addAll(unityProp("unity.abiFilters", "armeabi-v7a,arm64-v8a").toString().tokenize(','))
+        }
+        versionCode unityProp("unity.versionCode", 1) as int
+        versionName unityProp("unity.versionName", "0.1").toString()
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}

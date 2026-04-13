@@ -1,1 +1,45 @@
-.gitattributes
+# Unity generated
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+
+# Local build outputs
+[Bb]uild[Ss]moke/
+[Ee]xports/
+
+# Unity generated project files
+*.csproj
+*.sln
+*.user
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Android / Gradle outputs
+.gradle/
+*.apk
+*.aab
+
+# IDE state
+.vs/
+.vscode/
+.idea/
+
+# Crash and debug logs
+sysinfo.txt
+*.stackdump
+*.log
+
+# Memory captures
+[Mm]emory[Cc]aptures/
+
+# Asset meta data should only be ignored when the corresponding asset is also ignored.
+!/[Aa]ssets/**/*.meta
