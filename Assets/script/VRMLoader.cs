@@ -44,6 +44,13 @@ public class VRMLoaderV2 : MonoBehaviour
 
         backgroundManager = new BackgroundManagerV2(mainCamera);
 
+        // PhysBone タッチハンドラーを自動追加
+        if (GetComponent<PhysBoneTouchHandler>() == null)
+        {
+            gameObject.AddComponent<PhysBoneTouchHandler>();
+            DebugLogger.Log(LOG_FILE, "PhysBoneTouchHandler added");
+        }
+
         await Task.Delay(1000);
         await LoadVRMAsync();
     }
@@ -153,6 +160,54 @@ public class VRMLoaderV2 : MonoBehaviour
             var key = BlendShapeKey.CreateFromPreset(preset);
             blendShapeProxy.ImmediatelySetValue(key, value);
             blendShapeProxy.Apply();
+        }
+    }
+
+    // ===== Real-time settings callbacks (called from Java via UnitySendMessage) =====
+
+    public void OnCameraChanged(string csv)
+    {
+        if (vrmPositionController == null) return;
+
+        string[] parts = csv.Split(',');
+        if (parts.Length == 3 &&
+            float.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float distance) &&
+            float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float height) &&
+            float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float angle))
+        {
+            vrmPositionController.UpdateVRMPosition(distance, height, angle);
+        }
+    }
+
+    public void OnBackgroundColorChanged(string csv)
+    {
+        string[] parts = csv.Split(',');
+        if (parts.Length == 3 &&
+            float.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float r) &&
+            float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float g) &&
+            float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float b))
+        {
+            Camera cam = Camera.main;
+            if (cam != null)
+            {
+                cam.backgroundColor = new Color(r, g, b, 1f);
+            }
+        }
+    }
+
+    public void OnBackgroundChanged(string message)
+    {
+        if (backgroundManager != null)
+        {
+            backgroundManager.ApplyBackground();
+        }
+    }
+
+    public void OnImageAdjustmentChanged(string message)
+    {
+        if (backgroundManager != null && backgroundManager.HasBackgroundQuad())
+        {
+            backgroundManager.UpdateImageAdjustment();
         }
     }
 

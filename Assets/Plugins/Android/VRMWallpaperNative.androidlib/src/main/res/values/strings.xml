@@ -48,4 +48,5 @@
     <string name="vrm_error_wallpaper_not_active">Set this wallpaper first</string>
 
     <string name="vrm_wallpaper_description">VRM live wallpaper</string>
+    <string name="vrm_section_actions">Actions</string>
 </resources>

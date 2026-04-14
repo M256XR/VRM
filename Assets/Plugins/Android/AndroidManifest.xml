@@ -29,9 +29,10 @@
         </service>
 
         <activity
-            android:name="com.oreoreooooooo.VRM.SettingsActivity"
+            android:name="com.oreoreooooooo.VRM.MainActivity"
             android:exported="true"
-            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+            android:theme="@style/UnityThemeSelector"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|orientation|screenLayout|uiMode|screenSize|smallestScreenSize|fontScale|layoutDirection|density">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -39,10 +40,9 @@
         </activity>
 
         <activity
-            android:name="com.oreoreooooooo.VRM.MainActivity"
+            android:name="com.oreoreooooooo.VRM.SettingsActivity"
             android:exported="true"
-            android:theme="@style/UnityThemeSelector"
-            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|orientation|screenLayout|uiMode|screenSize|smallestScreenSize|fontScale|layoutDirection|density" />
+            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar" />
 
     </application>
 </manifest>
