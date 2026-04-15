@@ -67,7 +67,10 @@ public class PhysBoneTouchHandler : MonoBehaviour
 
     private void Start()
     {
-        DebugLogger.InitLog(LOG_FILE);
+        if (!System.IO.File.Exists(DebugLogger.GetLogPath(LOG_FILE)))
+        {
+            DebugLogger.InitLog(LOG_FILE);
+        }
         DebugLogger.LogSeparator(LOG_FILE, "PhysBoneTouchHandler Start");
         if (!enableExperimentalTouch)
         {
@@ -620,6 +623,8 @@ public class PhysBoneTouchHandler : MonoBehaviour
             return null;
         }
 
+        VrcSdkRuntimeDynamicsBootstrap.EnsureInitialized();
+
         object manager = null;
         if (ManagerInstanceField != null)
         {
@@ -638,10 +643,65 @@ public class PhysBoneTouchHandler : MonoBehaviour
             GameObject managerObject = new GameObject("PhysBoneManager");
             manager = managerObject.AddComponent(ManagerType);
             DontDestroyOnLoad(managerObject);
+            TryAssignManagerInstance(manager);
+            TryConfigureManagerForSdk(manager);
             DebugLogger.Log(LOG_FILE, "Created PhysBoneManager");
         }
 
         return manager;
+    }
+
+    private static void TryAssignManagerInstance(object manager)
+    {
+        if (manager == null || ManagerInstanceField == null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (ManagerInstanceField.IsStatic)
+            {
+                ManagerInstanceField.SetValue(null, manager);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static void TryConfigureManagerForSdk(object manager)
+    {
+        if (manager == null)
+        {
+            return;
+        }
+
+        try
+        {
+            Type type = manager.GetType();
+            PropertyInfo isSdkProperty = type.GetProperty("IsSDK", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (isSdkProperty != null && isSdkProperty.CanWrite)
+            {
+                isSdkProperty.SetValue(manager, true);
+            }
+            else
+            {
+                FieldInfo isSdkField = type.GetField("IsSDK", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                isSdkField?.SetValue(manager, true);
+            }
+
+            if (manager is Behaviour behaviour)
+            {
+                behaviour.enabled = true;
+            }
+
+            ManagerAwakeMethod?.Invoke(manager, null);
+            InitManagerMethod?.Invoke(manager, null);
+        }
+        catch
+        {
+        }
     }
 
 
@@ -651,6 +711,11 @@ public class PhysBoneTouchHandler : MonoBehaviour
         {
             DebugLogger.Log(LOG_FILE, message);
         }
+    }
+
+    public void SetVerboseLogging(bool enabled)
+    {
+        enableVerboseLogging = enabled;
     }
 
     private static Component EnsurePhysBoneRoot(GameObject avatarRoot)

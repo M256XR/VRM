@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 using VRM;
+using VRC.SDK3.Dynamics.PhysBone.Components;
 
 public class VRMLoaderV2 : MonoBehaviour
 {
@@ -17,11 +18,16 @@ public class VRMLoaderV2 : MonoBehaviour
     private BackgroundManagerV2 backgroundManager;
     private VRMPositionController vrmPositionController;
     private bool isLoading = false;
+    private PhysBoneTouchHandler physBoneTouchHandler;
+    private int baseScreenWidth;
+    private int baseScreenHeight;
+    private bool hasBaseScreenResolution;
 
     async void Start()
     {
         DebugLogger.InitLog(LOG_FILE);
         DebugLogger.LogSeparator(LOG_FILE, "VRMLoaderV2 Start");
+        VrcSdkRuntimeDynamicsBootstrap.EnsureInitialized();
 
         string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
         if (currentScene != "MainScene")
@@ -47,9 +53,15 @@ public class VRMLoaderV2 : MonoBehaviour
         // PhysBone タッチハンドラーを自動追加
         if (GetComponent<PhysBoneTouchHandler>() == null)
         {
-            gameObject.AddComponent<PhysBoneTouchHandler>();
+            physBoneTouchHandler = gameObject.AddComponent<PhysBoneTouchHandler>();
             DebugLogger.Log(LOG_FILE, "PhysBoneTouchHandler added");
         }
+        else
+        {
+            physBoneTouchHandler = GetComponent<PhysBoneTouchHandler>();
+        }
+
+        ApplyRuntimeSettings();
 
         await Task.Delay(1000);
         await LoadVRMAsync();
@@ -103,6 +115,7 @@ public class VRMLoaderV2 : MonoBehaviour
 
             vrmPositionController = new VRMPositionController(currentVRM, Vector3.zero);
             vrmPositionController.UpdateVRMPosition();
+            LogAvatarVisibility(currentVRM);
 
             blendShapeProxy = currentVRM.GetComponent<VRMBlendShapeProxy>();
             DebugLogger.Log(LOG_FILE, $"BlendShapeProxy: {(blendShapeProxy != null ? "OK" : "NULL")}");
@@ -110,6 +123,8 @@ public class VRMLoaderV2 : MonoBehaviour
             VRMColliderSetup.SetupColliders(currentVRM);
             VRMLoaderHelper.SetupAnimator(currentVRM);
             backgroundManager.ApplyBackground();
+            ApplyRuntimeSettings();
+            SendModelInfoToAndroid(currentVRM, sourceType, avatarPath);
 
             UpdateStatus($"{sourceType} loaded");
             FpsMonitor.Begin($"{sourceType}: {System.IO.Path.GetFileName(avatarPath)}");
@@ -124,6 +139,64 @@ public class VRMLoaderV2 : MonoBehaviour
         {
             isLoading = false;
         }
+    }
+
+    private void LogAvatarVisibility(GameObject avatarRoot)
+    {
+        if (avatarRoot == null)
+        {
+            return;
+        }
+
+        Camera camera = Camera.main;
+        if (camera == null)
+        {
+            DebugLogger.LogWarning(LOG_FILE, "Visibility diagnostic skipped: Camera.main is null");
+            return;
+        }
+
+        Renderer[] renderers = avatarRoot.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0)
+        {
+            DebugLogger.LogWarning(LOG_FILE, "Visibility diagnostic: avatar has no renderers");
+            return;
+        }
+
+        Plane[] frustumPlanes = GeometryUtility.CalculateFrustumPlanes(camera);
+        Bounds combinedBounds = new Bounds();
+        bool hasBounds = false;
+        int visibleByFrustum = 0;
+
+        foreach (Renderer renderer in renderers)
+        {
+            if (renderer == null)
+            {
+                continue;
+            }
+
+            if (!hasBounds)
+            {
+                combinedBounds = renderer.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                combinedBounds.Encapsulate(renderer.bounds);
+            }
+
+            if (renderer.enabled && renderer.gameObject.activeInHierarchy &&
+                GeometryUtility.TestPlanesAABB(frustumPlanes, renderer.bounds))
+            {
+                visibleByFrustum++;
+            }
+        }
+
+        DebugLogger.Log(LOG_FILE,
+            $"Visibility diagnostic: cameraPos={camera.transform.position} cameraRot={camera.transform.rotation.eulerAngles} " +
+            $"near={camera.nearClipPlane:F2} far={camera.farClipPlane:F2} fov={camera.fieldOfView:F1} cullingMask={camera.cullingMask} " +
+            $"avatarPos={avatarRoot.transform.position} avatarRot={avatarRoot.transform.rotation.eulerAngles} avatarScale={avatarRoot.transform.lossyScale} " +
+            $"renderers={renderers.Length} frustumVisibleRenderers={visibleByFrustum} boundsCenter={(hasBounds ? combinedBounds.center.ToString() : "none")} " +
+            $"boundsSize={(hasBounds ? combinedBounds.size.ToString() : "none")}");
     }
 
     string GetVRMPath()
@@ -149,8 +222,163 @@ public class VRMLoaderV2 : MonoBehaviour
 
     private void ApplyWallpaperRenderScale()
     {
-        ScalableBufferManager.ResizeBuffers(1.0f, 1.0f);
-        DebugLogger.Log(LOG_FILE, $"Wallpaper render scale applied: targetFrameRate={Application.targetFrameRate} vSyncCount={QualitySettings.vSyncCount} renderScale={ScalableBufferManager.widthScaleFactor:F2}x{ScalableBufferManager.heightScaleFactor:F2}");
+        float renderScale = Mathf.Clamp(PrefsHelper.GetRenderScale(1.0f), 0.5f, 1.0f);
+        int targetFps = Mathf.Clamp(PrefsHelper.GetTargetFps(30), 15, 60);
+        CaptureBaseScreenResolution();
+
+        Application.targetFrameRate = targetFps;
+        QualitySettings.resolutionScalingFixedDPIFactor = renderScale;
+        ScalableBufferManager.ResizeBuffers(renderScale, renderScale);
+
+        DebugLogger.Log(LOG_FILE,
+            $"Wallpaper render scale applied: targetFrameRate={Application.targetFrameRate} " +
+            $"vSyncCount={QualitySettings.vSyncCount} " +
+            $"renderScale={renderScale:F2} " +
+            $"bufferScale={ScalableBufferManager.widthScaleFactor:F2}x{ScalableBufferManager.heightScaleFactor:F2} " +
+            $"screen={Screen.width}x{Screen.height}");
+    }
+
+    private void CaptureBaseScreenResolution()
+    {
+        if (hasBaseScreenResolution)
+        {
+            return;
+        }
+
+        int width = Mathf.Max(Screen.width, Screen.currentResolution.width);
+        int height = Mathf.Max(Screen.height, Screen.currentResolution.height);
+        if (width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        baseScreenWidth = width;
+        baseScreenHeight = height;
+        hasBaseScreenResolution = true;
+        DebugLogger.Log(LOG_FILE, $"Captured base screen resolution: {baseScreenWidth}x{baseScreenHeight}");
+    }
+
+    private void ApplyRuntimeSettings()
+    {
+        ApplyWallpaperRenderScale();
+        ApplyInteractionSettings();
+
+        if (vrmPositionController != null)
+        {
+            vrmPositionController.UpdateVRMPosition();
+        }
+    }
+
+    private void ApplyInteractionSettings()
+    {
+        bool touchEnabled = PrefsHelper.GetTouchEnabled(true);
+        bool physBoneEnabled = PrefsHelper.GetPhysBoneEnabled(true);
+        bool verboseLogging = PrefsHelper.GetLogLevel(0) > 0;
+
+        if (physBoneTouchHandler == null)
+        {
+            physBoneTouchHandler = GetComponent<PhysBoneTouchHandler>();
+        }
+
+        if (physBoneTouchHandler != null)
+        {
+            physBoneTouchHandler.enabled = touchEnabled;
+            physBoneTouchHandler.SetVerboseLogging(verboseLogging);
+        }
+
+        if (currentVRM != null)
+        {
+            VRCPhysBone[] physBones = currentVRM.GetComponentsInChildren<VRCPhysBone>(true);
+            foreach (VRCPhysBone physBone in physBones)
+            {
+                if (physBone != null)
+                {
+                    physBone.enabled = physBoneEnabled;
+                }
+            }
+        }
+
+        DebugLogger.Log(LOG_FILE, $"Runtime settings applied: touch={touchEnabled} physBone={physBoneEnabled} verbose={verboseLogging}");
+    }
+
+    private void SendModelInfoToAndroid(GameObject avatarRoot, string sourceType, string avatarPath)
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        if (avatarRoot == null)
+        {
+            return;
+        }
+
+        int rendererCount = 0;
+        int materialSlots = 0;
+        int triangleCount = 0;
+        int physBoneCount = avatarRoot.GetComponentsInChildren<VRCPhysBone>(true).Length;
+
+        Renderer[] renderers = avatarRoot.GetComponentsInChildren<Renderer>(true);
+        rendererCount = renderers.Length;
+        foreach (Renderer renderer in renderers)
+        {
+            if (renderer == null)
+            {
+                continue;
+            }
+
+            if (renderer.sharedMaterials != null)
+            {
+                materialSlots += renderer.sharedMaterials.Length;
+            }
+
+            if (renderer is SkinnedMeshRenderer skinnedRenderer)
+            {
+                Mesh mesh = skinnedRenderer.sharedMesh;
+                if (mesh != null)
+                {
+                    triangleCount += mesh.triangles.Length / 3;
+                }
+            }
+            else
+            {
+                MeshFilter meshFilter = renderer.GetComponent<MeshFilter>();
+                if (meshFilter != null && meshFilter.sharedMesh != null)
+                {
+                    triangleCount += meshFilter.sharedMesh.triangles.Length / 3;
+                }
+            }
+        }
+
+        string info = string.Join("\n", new[]
+        {
+            $"モデル: {ResolveModelDisplayName(avatarPath)}",
+            $"形式: {sourceType}",
+            $"Renderer: {rendererCount}",
+            $"Material: {materialSlots}",
+            $"Triangle: {triangleCount:N0}",
+            $"PhysBone: {physBoneCount}"
+        });
+
+        try
+        {
+            using (AndroidJavaClass mainActivity = new AndroidJavaClass("com.oreoreooooooo.VRM.MainActivity"))
+            {
+                mainActivity.CallStatic("updateModelInfoFromUnity", info);
+            }
+        }
+        catch (Exception exception)
+        {
+            DebugLogger.Log(LOG_FILE, $"Failed to send model info to Android: {exception.Message}");
+        }
+#endif
+    }
+
+    private string ResolveModelDisplayName(string avatarPath)
+    {
+        string displayName = PrefsHelper.GetVRMDisplayName(string.Empty);
+        if (!string.IsNullOrWhiteSpace(displayName))
+        {
+            return displayName;
+        }
+
+        return System.IO.Path.GetFileName(avatarPath);
     }
 
     public void SetBlendShape(BlendShapePreset preset, float value)
@@ -209,6 +437,11 @@ public class VRMLoaderV2 : MonoBehaviour
         {
             backgroundManager.UpdateImageAdjustment();
         }
+    }
+
+    public void OnRuntimeSettingsChanged(string message)
+    {
+        ApplyRuntimeSettings();
     }
 
     public void ReloadVRM(string message)

@@ -13,8 +13,10 @@ Unity 2022.3.22f1 Android live wallpaper project.
   - `Assets/Plugins/Android/AndroidManifest.xml`
 - Smoke export helper:
   - `Assets/Editor/BuildSmokeTest.cs`
+- Build script:
+  - `Scripts/build_android.ps1`
 
-The launcher entry point is `com.oreoreooooooo.VRM.SettingsActivity`.
+The launcher entry point is `com.oreoreooooooo.VRM.MainActivity`.
 Unity is used for VRM rendering and wallpaper runtime.
 Android native UI is used for settings and file picking.
 The old `com.justzht.unilwp.droid.free` package is no longer used.
@@ -42,6 +44,12 @@ The old `com.justzht.unilwp.droid.free` package is no longer used.
 
 ## Smoke build
 
+Recommended command:
+
+`powershell -ExecutionPolicy Bypass -File D:\Projects\VRM\Scripts\build_android.ps1`
+
+The script handles export, Gradle build, Unity bundled JDK, and APK copy.
+
 Batch export method:
 
 `BuildSmokeTest.ExportAndroidProject`
@@ -53,16 +61,16 @@ File:
 Recent smoke-build output location:
 
 - Exported Gradle project:
-  - `BuildSmoke/AndroidExport`
+  - `BuildSmoke/AndroidExport_<timestamp>` or a named export folder
 - Debug APK:
-  - `BuildSmoke/AndroidExport/launcher/build/outputs/apk/debug/launcher-debug.apk`
+  - `Exportapk/wallpaper.apk`
 
 Recent verification:
 
 - Unity batch export: success
 - Gradle `:launcher:assembleDebug`: success
 - APK path:
-  - `BuildSmoke/AndroidExport/launcher/build/outputs/apk/debug/launcher-debug.apk`
+  - `Exportapk/wallpaper.apk`
 
 ## Notes
 

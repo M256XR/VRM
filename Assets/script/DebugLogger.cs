@@ -117,7 +117,7 @@ public static class DebugLogger
     /// <summary>
     /// ログファイルのフルパスを取得
     /// </summary>
-    private static string GetLogPath(string filename)
+    public static string GetLogPath(string filename)
     {
         return Path.Combine(logDirectory, filename);
     }
