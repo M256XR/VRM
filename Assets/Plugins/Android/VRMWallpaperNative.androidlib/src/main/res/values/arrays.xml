@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="vrm_background_fit_modes">
-        <item>Fit</item>
-        <item>Fill</item>
-        <item>Stretch</item>
-        <item>Custom</item>
+        <item>全画面表示</item>
+        <item>画像に合わせる</item>
+        <item>幅に合わせる</item>
+        <item>カスタム</item>
+    </string-array>
+
+    <string-array name="vrm_target_fps_options">
+        <item>20 FPS</item>
+        <item>30 FPS</item>
+        <item>45 FPS</item>
+        <item>60 FPS</item>
+    </string-array>
+
+    <string-array name="vrm_log_level_options">
+        <item>標準</item>
+        <item>詳細</item>
     </string-array>
 </resources>

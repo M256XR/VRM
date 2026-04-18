@@ -5,6 +5,8 @@ using UnityEngine.SceneManagement;
 
 public class SceneController : MonoBehaviour
 {
+    public const string EditorWallpaperPlayModePrefsKey = "EditorWallpaperPlayMode";
+
     private string logFilePath;
 
     void Awake()
@@ -26,6 +28,12 @@ public class SceneController : MonoBehaviour
     {
 #if UNITY_EDITOR
         yield return null;
+        if (PlayerPrefs.GetInt(EditorWallpaperPlayModePrefsKey, 0) == 1)
+        {
+            LogToFile("Editor wallpaper test mode detected. Staying in MainScene.");
+            yield break;
+        }
+
         LogToFile("Editor runtime detected. Loading SettingsScene.");
         SceneManager.LoadScene("SettingsScene");
 #else
