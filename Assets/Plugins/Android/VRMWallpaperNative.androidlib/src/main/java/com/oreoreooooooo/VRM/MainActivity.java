@@ -141,6 +141,7 @@ public class MainActivity extends Activity {
             Log.d(TAG, "onCreate");
             super.onCreate(savedInstanceState);
             appendStartupLog("onCreate: after super");
+            applyImmersivePreviewMode();
             activeInstance = this;
 
             setContentView(R.layout.vrm_activity_main);
@@ -166,6 +167,7 @@ public class MainActivity extends Activity {
         try {
             super.onResume();
             appendStartupLog("onResume: enter");
+            applyImmersivePreviewMode();
             UnityRuntimeHost.get(this).setAppVisible(true);
         } catch (Throwable throwable) {
             appendStartupLog("onResume: exception", throwable);
@@ -193,6 +195,9 @@ public class MainActivity extends Activity {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            applyImmersivePreviewMode();
+        }
     }
 
     @Override
@@ -214,6 +219,19 @@ public class MainActivity extends Activity {
             return;
         }
         super.onBackPressed();
+    }
+
+    private void applyImmersivePreviewMode() {
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        ensureSettingsControlsOnTop();
     }
 
     // ===== Settings panel toggle =====
@@ -253,6 +271,7 @@ public class MainActivity extends Activity {
                     settingsOverlay.setAlpha(1f);
                     settingsOverlay.setVisibility(View.GONE);
                     animateToggleButtonIn();
+                    ensureSettingsControlsOnTop();
                 })
                 .start();
         settingsOverlay.animate()
@@ -269,13 +288,14 @@ public class MainActivity extends Activity {
         toggleButton.setAlpha(1f);
         toggleButton.setScaleX(1f);
         toggleButton.setScaleY(1f);
+        ensureSettingsControlsOnTop();
     }
 
     private void animateToggleButtonIn() {
         toggleButton.animate().cancel();
         toggleButton.clearAnimation();
         toggleButton.setVisibility(View.VISIBLE);
-        toggleButton.bringToFront();
+        ensureSettingsControlsOnTop();
         toggleButton.setAlpha(0f);
         toggleButton.animate()
                 .alpha(1f)
@@ -304,6 +324,35 @@ public class MainActivity extends Activity {
                     toggleButton.setScaleY(1f);
                 })
                 .start();
+    }
+
+    private void ensureSettingsControlsOnTop() {
+        if (previewSurfaceView != null) {
+            previewSurfaceView.setZOrderOnTop(false);
+            previewSurfaceView.setZOrderMediaOverlay(false);
+        }
+
+        if (settingsOverlay != null) {
+            settingsOverlay.setTranslationZ(dp(16.0f));
+            settingsOverlay.bringToFront();
+        }
+
+        if (toggleButton != null) {
+            toggleButton.setTranslationZ(dp(24.0f));
+            toggleButton.bringToFront();
+            toggleButton.invalidate();
+        }
+
+        View root = getWindow().getDecorView();
+        root.postDelayed(() -> {
+            if (settingsOverlay != null) {
+                settingsOverlay.bringToFront();
+            }
+            if (toggleButton != null) {
+                toggleButton.bringToFront();
+                toggleButton.invalidate();
+            }
+        }, 80L);
     }
 
     private void showTab(View selectedPanel, Button selectedButton, String accentColor) {
@@ -520,6 +569,7 @@ public class MainActivity extends Activity {
         applyM3UiStyle();
         showTab(modelPanel, modelTabButton, "#7F5AF0");
         bindDirectValueEditors();
+        ensureSettingsControlsOnTop();
     }
 
     private void bindActions() {
