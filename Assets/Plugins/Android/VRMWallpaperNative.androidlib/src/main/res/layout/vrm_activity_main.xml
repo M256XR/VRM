@@ -4,8 +4,8 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <FrameLayout
-        android:id="@+id/vrm_unity_container"
+    <SurfaceView
+        android:id="@+id/vrm_preview_surface"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 

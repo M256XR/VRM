@@ -17,6 +17,8 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
@@ -24,15 +26,12 @@ import android.widget.AdapterView;
 import android.widget.EditText;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
-
-import com.unity3d.player.UnityPlayer;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -44,7 +43,6 @@ import java.util.Locale;
 public class MainActivity extends Activity {
     private static final String TAG = "VRMMainActivity";
     private static final String STARTUP_LOG_NAME = "mainactivity_start.log";
-    private static final boolean UNITY_ONLY_STARTUP_PROBE = false;
     private static MainActivity activeInstance;
     private static String lastModelInfo = "";
     private static String lastFpsInfo = "";
@@ -70,10 +68,9 @@ public class MainActivity extends Activity {
     private static final long SETTINGS_HIDE_DURATION_MS = 180L;
     private static final long TOGGLE_BUTTON_DURATION_MS = 180L;
 
-    private UnityPlayer unityPlayer;
-
     private View settingsOverlay;
     private View toggleButton;
+    private SurfaceView previewSurfaceView;
     private View imageAdjustmentPanel;
     private View colorPreview;
     private View settingsSheet;
@@ -141,38 +138,18 @@ public class MainActivity extends Activity {
             appendStartupLog("onCreate: after super");
             activeInstance = this;
 
-            appendStartupLog("onCreate: before UnityPlayer");
-            unityPlayer = new UnityPlayer(this);
-            appendStartupLog("onCreate: after UnityPlayer");
-
-            if (UNITY_ONLY_STARTUP_PROBE) {
-                appendStartupLog("onCreate: unity-only probe mode");
-                setContentView(unityPlayer);
-                appendStartupLog("onCreate: after setContentView(unityPlayer)");
-            } else {
-                setContentView(R.layout.vrm_activity_main);
-                appendStartupLog("onCreate: after setContentView");
-                FrameLayout container = findViewById(R.id.vrm_unity_container);
-                appendStartupLog("onCreate: after findViewById container=" + (container != null));
-                container.addView(unityPlayer, new FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT));
-                appendStartupLog("onCreate: after addView");
-            }
-
-            unityPlayer.requestFocus();
-            appendStartupLog("onCreate: after requestFocus");
-
-            if (!UNITY_ONLY_STARTUP_PROBE) {
-                bindViews();
-                appendStartupLog("onCreate: after bindViews");
-                bindActions();
-                appendStartupLog("onCreate: after bindActions");
-                loadCurrentSettings();
-                appendStartupLog("onCreate: after loadCurrentSettings");
-                showSettings();
-                appendStartupLog("onCreate: after showSettings");
-            }
+            setContentView(R.layout.vrm_activity_main);
+            appendStartupLog("onCreate: after setContentView");
+            UnityRuntimeHost.get(this);
+            appendStartupLog("onCreate: after UnityRuntimeHost");
+            bindViews();
+            appendStartupLog("onCreate: after bindViews");
+            bindActions();
+            appendStartupLog("onCreate: after bindActions");
+            loadCurrentSettings();
+            appendStartupLog("onCreate: after loadCurrentSettings");
+            showSettings();
+            appendStartupLog("onCreate: after showSettings");
         } catch (Throwable throwable) {
             appendStartupLog("onCreate: exception", throwable);
             throw throwable;
@@ -184,10 +161,7 @@ public class MainActivity extends Activity {
         try {
             super.onResume();
             appendStartupLog("onResume: enter");
-            if (unityPlayer != null) {
-                unityPlayer.resume();
-                appendStartupLog("onResume: after unityPlayer.resume");
-            }
+            UnityRuntimeHost.get(this).setAppVisible(true);
         } catch (Throwable throwable) {
             appendStartupLog("onResume: exception", throwable);
             throw throwable;
@@ -197,10 +171,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         appendStartupLog("onPause: enter");
-        if (unityPlayer != null) {
-            unityPlayer.pause();
-            appendStartupLog("onPause: after unityPlayer.pause");
-        }
+        UnityRuntimeHost.get(this).setAppVisible(false);
         super.onPause();
     }
 
@@ -210,36 +181,25 @@ public class MainActivity extends Activity {
         if (activeInstance == this) {
             activeInstance = null;
         }
-        if (unityPlayer != null) {
-            unityPlayer.quit();
-            appendStartupLog("onDestroy: after unityPlayer.quit");
-            unityPlayer = null;
-        }
+        UnityRuntimeHost.get(this).setAppVisible(false);
         super.onDestroy();
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        if (unityPlayer != null) {
-            unityPlayer.configurationChanged(newConfig);
-        }
     }
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (unityPlayer != null) {
-            unityPlayer.windowFocusChanged(hasFocus);
-        }
     }
 
     @Override
     public void onLowMemory() {
         super.onLowMemory();
-        if (unityPlayer != null) {
-            unityPlayer.lowMemory();
-        }
+        UnityRuntimeHost.get(this).lowMemory();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        UnityRuntimeHost.get(this).configurationChanged(newConfig);
     }
 
     @Override
@@ -460,6 +420,7 @@ public class MainActivity extends Activity {
     private void bindViews() {
         settingsOverlay = findViewById(R.id.vrm_settings_overlay);
         toggleButton = findViewById(R.id.vrm_button_toggle_settings);
+        previewSurfaceView = findViewById(R.id.vrm_preview_surface);
         settingsSheet = findViewById(R.id.vrm_settings_sheet);
         settingsHandle = findViewById(R.id.vrm_settings_handle);
         modelPanel = findViewById(R.id.vrm_panel_model);
@@ -514,6 +475,12 @@ public class MainActivity extends Activity {
         touchEnabledSwitch = findViewById(R.id.vrm_switch_touch_enabled);
         physBoneEnabledSwitch = findViewById(R.id.vrm_switch_physbone_enabled);
         fpsOverlaySwitch = findViewById(R.id.vrm_switch_fps_overlay);
+
+        previewSurfaceView.getHolder().addCallback(new PreviewSurfaceCallback());
+        previewSurfaceView.setOnTouchListener((view, event) -> {
+            UnityRuntimeHost.get(MainActivity.this).injectEvent(event);
+            return true;
+        });
 
         distanceSeekBar.setMax(Math.round((DISTANCE_MAX - DISTANCE_MIN) * 10.0f));
         heightSeekBar.setMax(Math.round((HEIGHT_MAX - HEIGHT_MIN) * 20.0f));
@@ -1102,11 +1069,7 @@ public class MainActivity extends Activity {
     // ===== Unity notifications =====
 
     private void notifyUnity(String method, String message) {
-        try {
-            UnityPlayer.UnitySendMessage("VRMLoader", method, message);
-        } catch (Exception e) {
-            Log.w(TAG, "UnitySendMessage failed: " + method, e);
-        }
+        UnityRuntimeHost.get(this).sendMessage(method, message);
     }
 
     private void notifyCameraChanged() {
@@ -1377,9 +1340,7 @@ public class MainActivity extends Activity {
             return;
         }
 
-        Intent intent = new Intent("com.oreoreooooooo.VRM.RELOAD_VRM");
-        intent.setPackage(getPackageName());
-        sendBroadcast(intent);
+        UnityRuntimeHost.get(this).sendMessage("ReloadVRM", "");
         toast(R.string.vrm_wallpaper_reloaded);
     }
 
@@ -1567,6 +1528,23 @@ public class MainActivity extends Activity {
                 default:
                     return true;
             }
+        }
+    }
+
+    private final class PreviewSurfaceCallback implements SurfaceHolder.Callback {
+        @Override
+        public void surfaceCreated(SurfaceHolder holder) {
+            UnityRuntimeHost.get(MainActivity.this).setAppSurface(holder.getSurface());
+        }
+
+        @Override
+        public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+            UnityRuntimeHost.get(MainActivity.this).setAppSurface(holder.getSurface());
+        }
+
+        @Override
+        public void surfaceDestroyed(SurfaceHolder holder) {
+            UnityRuntimeHost.get(MainActivity.this).clearAppSurface(holder.getSurface());
         }
     }
 }
