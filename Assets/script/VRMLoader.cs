@@ -222,20 +222,41 @@ public class VRMLoaderV2 : MonoBehaviour
 
     private void ApplyWallpaperRenderScale()
     {
-        float renderScale = Mathf.Clamp(PrefsHelper.GetRenderScale(1.0f), 0.5f, 1.5f);
+        float renderScale = Mathf.Clamp(PrefsHelper.GetRenderScale(1.0f), 0.5f, 1.0f);
+        float bufferScale = renderScale;
         int targetFps = Mathf.Clamp(PrefsHelper.GetTargetFps(30), 15, 60);
         CaptureBaseScreenResolution();
+        EnableDynamicResolutionForCameras();
 
         Application.targetFrameRate = targetFps;
-        QualitySettings.resolutionScalingFixedDPIFactor = renderScale;
-        ScalableBufferManager.ResizeBuffers(renderScale, renderScale);
+        QualitySettings.resolutionScalingFixedDPIFactor = bufferScale;
+        ScalableBufferManager.ResizeBuffers(bufferScale, bufferScale);
 
         DebugLogger.Log(LOG_FILE,
             $"Wallpaper render scale applied: targetFrameRate={Application.targetFrameRate} " +
             $"vSyncCount={QualitySettings.vSyncCount} " +
-            $"renderScale={renderScale:F2} " +
+            $"renderScale={renderScale:F2} bufferScaleRequest={bufferScale:F2} " +
             $"bufferScale={ScalableBufferManager.widthScaleFactor:F2}x{ScalableBufferManager.heightScaleFactor:F2} " +
             $"screen={Screen.width}x{Screen.height}");
+    }
+
+    private void EnableDynamicResolutionForCameras()
+    {
+        Camera[] cameras = Camera.allCameras;
+        foreach (Camera camera in cameras)
+        {
+            if (camera == null)
+            {
+                continue;
+            }
+
+            if (!camera.allowDynamicResolution)
+            {
+                camera.allowDynamicResolution = true;
+            }
+        }
+
+        DebugLogger.Log(LOG_FILE, $"Dynamic resolution enabled for cameras: count={cameras.Length}");
     }
 
     private void CaptureBaseScreenResolution()
@@ -446,7 +467,7 @@ public class VRMLoaderV2 : MonoBehaviour
 
     public void ReloadVRM(string message)
     {
-        DebugLogger.LogSeparator(LOG_FILE, "ReloadVRM called by BroadcastReceiver");
+        DebugLogger.LogSeparator(LOG_FILE, "ReloadVRM called");
         DebugLogger.Log(LOG_FILE, $"Message: '{message}'");
 
         if (isLoading)

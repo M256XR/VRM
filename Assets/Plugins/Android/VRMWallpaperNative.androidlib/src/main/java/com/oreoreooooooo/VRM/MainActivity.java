@@ -61,7 +61,7 @@ public class MainActivity extends Activity {
     private static final float SCALE_MIN = 0.2f;
     private static final float SCALE_MAX = 3.0f;
     private static final float RENDER_SCALE_MIN = 0.5f;
-    private static final float RENDER_SCALE_MAX = 1.5f;
+    private static final float RENDER_SCALE_MAX = 1.0f;
     private static final int[] TARGET_FPS_VALUES = new int[]{20, 30, 45, 60};
     private static final float SHEET_DISMISS_THRESHOLD_DP = 18.0f;
     private static final long SETTINGS_SHOW_DURATION_MS = 220L;

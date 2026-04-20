@@ -38,6 +38,25 @@ The current host model keeps one Unity runtime and switches render surfaces inst
   - Sends the preview `SurfaceView` surface to the host.
   - Sends settings changes to Unity through the host.
 
+## Settings Flow
+
+Settings changes are written to `WallpaperPrefs` first, then sent directly to the current Unity runtime through `UnityRuntimeHost`.
+
+There is no longer a broadcast bridge for normal settings changes. Keep this direct path unless the wallpaper service must be controlled from another process again.
+
+## Render Scale
+
+Render scale uses Unity dynamic resolution:
+
+- `MainActivity` stores `renderScale`.
+- `VRMLoaderV2` reads it through `PrefsHelper`.
+- `VRMLoaderV2` enables `allowDynamicResolution` for cameras.
+- `ScalableBufferManager.ResizeBuffers(scale, scale)` applies the runtime buffer scale.
+
+The supported UI range is `0.5` to `1.0`. Values above `1.0` are intentionally not exposed because dynamic resolution is used to reduce buffer cost, not supersample.
+
+If the scale appears ineffective, check `vrm_loader_v2.log` for the applied camera count and `ScalableBufferManager` scale factors before changing the Android surface lifecycle.
+
 ## Checks Before Changing This
 
 When touching the host or lifecycle code, test:

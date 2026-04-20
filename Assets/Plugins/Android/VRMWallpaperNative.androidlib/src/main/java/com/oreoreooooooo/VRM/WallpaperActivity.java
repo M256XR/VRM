@@ -2,10 +2,6 @@ package com.oreoreooooooo.VRM;
 
 import android.annotation.TargetApi;
 import android.app.WallpaperColors;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Build;
@@ -17,13 +13,8 @@ import android.view.WindowInsets;
 
 public class WallpaperActivity extends WallpaperService {
     private static final String TAG = "VRMWallpaper";
-    private static final String ACTION_RELOAD_VRM = "com.oreoreooooooo.VRM.RELOAD_VRM";
-    private static final String ACTION_UNITY_MESSAGE = "com.oreoreooooooo.VRM.UNITY_MESSAGE";
-    private static final String EXTRA_UNITY_METHOD = "method";
-    private static final String EXTRA_UNITY_MESSAGE = "message";
 
     private UnityRuntimeHost unityHost;
-    private BroadcastReceiver reloadReceiver;
     private int visibleSurfaces;
 
     @Override
@@ -32,20 +23,11 @@ public class WallpaperActivity extends WallpaperService {
         super.onCreate();
 
         unityHost = UnityRuntimeHost.get(this);
-        registerReloadReceiver();
         Log.d(TAG, "Wallpaper service created");
     }
 
     @Override
     public void onDestroy() {
-        if (reloadReceiver != null) {
-            try {
-                unregisterReceiver(reloadReceiver);
-            } catch (Exception exception) {
-                Log.w(TAG, "Failed to unregister reload receiver", exception);
-            }
-        }
-
         super.onDestroy();
         Log.d(TAG, "Wallpaper service destroyed");
     }
@@ -77,45 +59,6 @@ public class WallpaperActivity extends WallpaperService {
         if (unityHost != null) {
             unityHost.configurationChanged(newConfig);
         }
-    }
-
-    private void registerReloadReceiver() {
-        reloadReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                if (intent == null) {
-                    return;
-                }
-
-                android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
-                String action = intent.getAction();
-                if (ACTION_RELOAD_VRM.equals(action)) {
-                    handler.post(() -> UnityRuntimeHost.get(WallpaperActivity.this).sendMessage("ReloadVRM", ""));
-                    return;
-                }
-
-                if (ACTION_UNITY_MESSAGE.equals(action)) {
-                    String method = intent.getStringExtra(EXTRA_UNITY_METHOD);
-                    String message = intent.getStringExtra(EXTRA_UNITY_MESSAGE);
-                    if (method == null || method.trim().isEmpty()) {
-                        Log.w(TAG, "Unity message skipped: method is empty");
-                        return;
-                    }
-
-                    String safeMessage = message == null ? "" : message;
-                    handler.post(() -> UnityRuntimeHost.get(WallpaperActivity.this).sendMessage(method, safeMessage));
-                }
-            }
-        };
-
-        IntentFilter filter = new IntentFilter(ACTION_RELOAD_VRM);
-        filter.addAction(ACTION_UNITY_MESSAGE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(reloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-            return;
-        }
-
-        registerReceiver(reloadReceiver, filter);
     }
 
     private int getWallpaperColor() {
