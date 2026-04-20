@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="vrm_settings_title">設定</string>
+    <string name="vrm_icon_settings">⚙</string>
+    <string name="vrm_button_toggle_settings">設定を開く</string>
+    <string name="vrm_icon_reload">↻</string>
+    <string name="vrm_icon_close">✕</string>
+    <string name="vrm_tab_model">モデル</string>
+    <string name="vrm_tab_background">背景</string>
+    <string name="vrm_tab_camera">カメラ</string>
+    <string name="vrm_tab_display">表示</string>
+    <string name="vrm_tab_profile">P</string>
     <string name="vrm_section_vrm">モデル</string>
     <string name="vrm_section_background">背景</string>
     <string name="vrm_section_background_color">背景色</string>
@@ -20,6 +29,8 @@
     <string name="vrm_button_pick_vrm">モデルを選ぶ</string>
     <string name="vrm_button_pick_image">背景画像を選ぶ</string>
     <string name="vrm_button_use_solid">単色背景にする</string>
+    <string name="vrm_background_mode_image">画像</string>
+    <string name="vrm_background_mode_solid">単色</string>
     <string name="vrm_button_reset_adjustment">背景画像調整をリセット</string>
     <string name="vrm_button_reset_model_transform">モデル調整をリセット</string>
     <string name="vrm_button_reset_all_settings">全設定をリセット</string>
@@ -34,6 +45,8 @@
     <string name="vrm_image_background_mode">背景: 画像</string>
     <string name="vrm_model_info_empty">モデル情報はまだありません</string>
     <string name="vrm_fps_info_empty">FPS情報はまだありません</string>
+    <string name="vrm_render_scale_hint">低いほど軽く、高いほど輪郭がはっきりします</string>
+    <string name="vrm_profile_hint">3スロットに現在のモデル、背景、カメラ、表示設定を保存できます。</string>
 
     <string name="vrm_label_red">赤</string>
     <string name="vrm_label_green">緑</string>

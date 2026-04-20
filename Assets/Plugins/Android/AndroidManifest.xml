@@ -40,10 +40,5 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name="com.oreoreooooooo.VRM.SettingsActivity"
-            android:exported="true"
-            android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar" />
-
     </application>
 </manifest>

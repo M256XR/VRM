@@ -222,7 +222,7 @@ public class VRMLoaderV2 : MonoBehaviour
 
     private void ApplyWallpaperRenderScale()
     {
-        float renderScale = Mathf.Clamp(PrefsHelper.GetRenderScale(1.0f), 0.5f, 1.0f);
+        float renderScale = Mathf.Clamp(PrefsHelper.GetRenderScale(1.0f), 0.5f, 1.5f);
         int targetFps = Mathf.Clamp(PrefsHelper.GetTargetFps(30), 15, 60);
         CaptureBaseScreenResolution();
 

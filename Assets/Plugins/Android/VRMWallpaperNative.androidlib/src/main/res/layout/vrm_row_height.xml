@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/VrmSettingsSliderRow">
+    <TextView style="@style/VrmSettingsSliderLabel" android:text="@string/vrm_label_height" />
+    <SeekBar android:id="@+id/vrm_seek_height" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
+    <TextView android:id="@+id/vrm_text_height_value" style="@style/VrmSettingsSliderValue" android:text="0.50" />
+</LinearLayout>

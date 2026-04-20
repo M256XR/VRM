@@ -1,6 +1,7 @@
 package com.oreoreooooooo.VRM;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.WallpaperInfo;
 import android.app.WallpaperManager;
 import android.content.ComponentName;
@@ -8,19 +9,23 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.database.Cursor;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.EditText;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.Switch;
@@ -58,8 +63,12 @@ public class MainActivity extends Activity {
     private static final float SCALE_MIN = 0.2f;
     private static final float SCALE_MAX = 3.0f;
     private static final float RENDER_SCALE_MIN = 0.5f;
-    private static final float RENDER_SCALE_MAX = 1.0f;
+    private static final float RENDER_SCALE_MAX = 1.5f;
     private static final int[] TARGET_FPS_VALUES = new int[]{20, 30, 45, 60};
+    private static final float SHEET_DISMISS_THRESHOLD_DP = 18.0f;
+    private static final long SETTINGS_SHOW_DURATION_MS = 220L;
+    private static final long SETTINGS_HIDE_DURATION_MS = 180L;
+    private static final long TOGGLE_BUTTON_DURATION_MS = 180L;
 
     private UnityPlayer unityPlayer;
 
@@ -67,9 +76,22 @@ public class MainActivity extends Activity {
     private View toggleButton;
     private View imageAdjustmentPanel;
     private View colorPreview;
+    private View settingsSheet;
+    private View settingsHandle;
+    private View modelPanel;
+    private View backgroundPanel;
+    private View cameraPanel;
+    private View displayPanel;
+    private View profilePanel;
+    private Button modelTabButton;
+    private Button backgroundTabButton;
+    private Button cameraTabButton;
+    private Button displayTabButton;
+    private Button profileTabButton;
 
     private TextView vrmPathText;
     private TextView backgroundModeText;
+    private TextView backgroundImagePathText;
     private TextView distanceValueText;
     private TextView heightValueText;
     private TextView angleValueText;
@@ -232,15 +254,162 @@ public class MainActivity extends Activity {
     // ===== Settings panel toggle =====
 
     private void showSettings() {
-        settingsOverlay.setVisibility(View.VISIBLE);
-        toggleButton.setVisibility(View.GONE);
         refreshFileLabels();
         updateImageAdjustmentVisibility();
+        settingsOverlay.setVisibility(View.VISIBLE);
+        settingsOverlay.setAlpha(0f);
+
+        animateToggleButtonOut();
+        settingsSheet.post(() -> {
+            settingsSheet.animate().cancel();
+            float startTranslationY = settingsSheet.getHeight() > 0 ? settingsSheet.getHeight() : dp(320.0f);
+            settingsSheet.setTranslationY(startTranslationY);
+            settingsSheet.animate()
+                    .translationY(0f)
+                    .setDuration(SETTINGS_SHOW_DURATION_MS)
+                    .start();
+            settingsOverlay.animate()
+                    .alpha(1f)
+                    .setDuration(SETTINGS_SHOW_DURATION_MS)
+                    .start();
+        });
     }
 
     private void hideSettings() {
+        settingsSheet.animate().cancel();
+        settingsOverlay.animate().cancel();
+        float endTranslationY = settingsSheet.getHeight() > 0 ? settingsSheet.getHeight() : dp(320.0f);
+        settingsSheet.animate()
+                .translationY(endTranslationY)
+                .setDuration(SETTINGS_HIDE_DURATION_MS)
+                .withEndAction(() -> {
+                    settingsSheet.setTranslationY(0f);
+                    settingsOverlay.setAlpha(1f);
+                    settingsOverlay.setVisibility(View.GONE);
+                    animateToggleButtonIn();
+                })
+                .start();
+        settingsOverlay.animate()
+                .alpha(0f)
+                .setDuration(SETTINGS_HIDE_DURATION_MS)
+                .start();
+    }
+
+    private void hideSettingsImmediate() {
+        settingsSheet.setTranslationY(0f);
+        settingsOverlay.setAlpha(1f);
         settingsOverlay.setVisibility(View.GONE);
         toggleButton.setVisibility(View.VISIBLE);
+        toggleButton.setAlpha(1f);
+        toggleButton.setScaleX(1f);
+        toggleButton.setScaleY(1f);
+    }
+
+    private void animateToggleButtonIn() {
+        toggleButton.animate().cancel();
+        toggleButton.clearAnimation();
+        toggleButton.setVisibility(View.VISIBLE);
+        toggleButton.bringToFront();
+        toggleButton.setAlpha(0f);
+        toggleButton.animate()
+                .alpha(1f)
+                .setDuration(TOGGLE_BUTTON_DURATION_MS)
+                .start();
+    }
+
+    private void animateToggleButtonOut() {
+        toggleButton.animate().cancel();
+        toggleButton.clearAnimation();
+        if (toggleButton.getVisibility() != View.VISIBLE) {
+            toggleButton.setVisibility(View.INVISIBLE);
+            toggleButton.setAlpha(1f);
+            toggleButton.setScaleX(1f);
+            toggleButton.setScaleY(1f);
+            return;
+        }
+
+        toggleButton.animate()
+                .alpha(0f)
+                .setDuration(TOGGLE_BUTTON_DURATION_MS)
+                .withEndAction(() -> {
+                    toggleButton.setVisibility(View.INVISIBLE);
+                    toggleButton.setAlpha(1f);
+                    toggleButton.setScaleX(1f);
+                    toggleButton.setScaleY(1f);
+                })
+                .start();
+    }
+
+    private void showTab(View selectedPanel, Button selectedButton, String accentColor) {
+        View[] panels = new View[]{modelPanel, backgroundPanel, cameraPanel, displayPanel, profilePanel};
+        Button[] buttons = new Button[]{modelTabButton, backgroundTabButton, cameraTabButton, displayTabButton, profileTabButton};
+
+        for (View panel : panels) {
+            if (panel != null) {
+                panel.setVisibility(panel == selectedPanel ? View.VISIBLE : View.GONE);
+            }
+        }
+
+        for (Button button : buttons) {
+            if (button != null) {
+                boolean active = button == selectedButton;
+                button.setTextColor(active ? Color.WHITE : Color.parseColor("#99FFFFFF"));
+                button.setBackground(makeRoundDrawable(active ? accentColor : "#00000000", 100.0f));
+            }
+        }
+    }
+
+    private void applyM3UiStyle() {
+        styleButton(findViewById(R.id.vrm_button_set_wallpaper), "#7F5AF0", "#FFFFFF", 100.0f);
+        styleButton(findViewById(R.id.vrm_button_reload_wallpaper), "#22FFFFFF", "#FFFFFF", 100.0f);
+        styleButton(findViewById(R.id.vrm_button_close_settings), "#00000000", "#BBBBBB", 100.0f);
+        styleButton(toggleButton, "#AA161220", "#FFFFFF", 100.0f);
+        styleButton(findViewById(R.id.vrm_button_pick_vrm), "#7F5AF0", "#FFFFFF", 100.0f);
+        styleButton(findViewById(R.id.vrm_button_pick_image), "#22FFFFFF", "#F2EEF8", 14.0f);
+        styleButton(findViewById(R.id.vrm_button_reset_model_transform), "#18FFFFFF", "#F2EEF8", 14.0f);
+        styleButton(findViewById(R.id.vrm_button_reset_adjustment), "#18FFFFFF", "#F2EEF8", 14.0f);
+        styleButton(findViewById(R.id.vrm_button_reset_all_settings), "#22FF6B6B", "#FF8A8A", 14.0f);
+
+        int[] profileButtons = new int[]{
+                R.id.vrm_button_save_profile_1, R.id.vrm_button_save_profile_2, R.id.vrm_button_save_profile_3
+        };
+        for (int id : profileButtons) {
+            styleButton(findViewById(id), "#3DA9FC", "#FFFFFF", 14.0f);
+        }
+
+        int[] profileLoadButtons = new int[]{
+                R.id.vrm_button_load_profile_1, R.id.vrm_button_load_profile_2, R.id.vrm_button_load_profile_3
+        };
+        for (int id : profileLoadButtons) {
+            styleButton(findViewById(id), "#18FFFFFF", "#F2EEF8", 14.0f);
+        }
+
+        updateBackgroundModeButtons();
+    }
+
+    private void styleButton(View view, String backgroundColor, String textColor, float radiusDp) {
+        if (view == null) {
+            return;
+        }
+
+        view.setBackground(makeRoundDrawable(backgroundColor, radiusDp));
+        if (view instanceof Button) {
+            ((Button) view).setTextColor(Color.parseColor(textColor));
+            ((Button) view).setAllCaps(false);
+        } else if (view instanceof ImageButton) {
+            ((ImageButton) view).setColorFilter(Color.parseColor(textColor));
+        }
+    }
+
+    private GradientDrawable makeRoundDrawable(String color, float radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(Color.parseColor(color));
+        drawable.setCornerRadius(dp(radiusDp));
+        return drawable;
+    }
+
+    private float dp(float value) {
+        return value * getResources().getDisplayMetrics().density;
     }
 
     private void appendStartupLog(String message) {
@@ -291,9 +460,22 @@ public class MainActivity extends Activity {
     private void bindViews() {
         settingsOverlay = findViewById(R.id.vrm_settings_overlay);
         toggleButton = findViewById(R.id.vrm_button_toggle_settings);
+        settingsSheet = findViewById(R.id.vrm_settings_sheet);
+        settingsHandle = findViewById(R.id.vrm_settings_handle);
+        modelPanel = findViewById(R.id.vrm_panel_model);
+        backgroundPanel = findViewById(R.id.vrm_panel_background);
+        cameraPanel = findViewById(R.id.vrm_panel_camera);
+        displayPanel = findViewById(R.id.vrm_panel_display);
+        profilePanel = findViewById(R.id.vrm_panel_profile);
+        modelTabButton = findViewById(R.id.vrm_tab_model);
+        backgroundTabButton = findViewById(R.id.vrm_tab_background);
+        cameraTabButton = findViewById(R.id.vrm_tab_camera);
+        displayTabButton = findViewById(R.id.vrm_tab_display);
+        profileTabButton = findViewById(R.id.vrm_tab_profile);
 
         vrmPathText = findViewById(R.id.vrm_text_vrm_path);
         backgroundModeText = findViewById(R.id.vrm_text_background_mode);
+        backgroundImagePathText = findViewById(R.id.vrm_text_background_image_path);
         distanceValueText = findViewById(R.id.vrm_text_distance_value);
         heightValueText = findViewById(R.id.vrm_text_height_value);
         angleValueText = findViewById(R.id.vrm_text_angle_value);
@@ -356,18 +538,34 @@ public class MainActivity extends Activity {
 
         ArrayAdapter<CharSequence> logLevelAdapter = createWhiteSpinnerAdapter(R.array.vrm_log_level_options);
         logLevelSpinner.setAdapter(logLevelAdapter);
+
+        applyM3UiStyle();
+        showTab(modelPanel, modelTabButton, "#7F5AF0");
+        bindDirectValueEditors();
     }
 
     private void bindActions() {
         toggleButton.setOnClickListener(v -> showSettings());
         findViewById(R.id.vrm_button_close_settings).setOnClickListener(v -> hideSettings());
         findViewById(R.id.vrm_settings_dismiss).setOnClickListener(v -> hideSettings());
+        settingsHandle.setOnTouchListener(new SwipeDismissTouchListener());
+        modelTabButton.setOnClickListener(v -> showTab(modelPanel, modelTabButton, "#7F5AF0"));
+        backgroundTabButton.setOnClickListener(v -> showTab(backgroundPanel, backgroundTabButton, "#2CB67D"));
+        cameraTabButton.setOnClickListener(v -> showTab(cameraPanel, cameraTabButton, "#FF8906"));
+        displayTabButton.setOnClickListener(v -> showTab(displayPanel, displayTabButton, "#F25F4C"));
+        profileTabButton.setOnClickListener(v -> showTab(profilePanel, profileTabButton, "#3DA9FC"));
 
         findViewById(R.id.vrm_button_pick_vrm).setOnClickListener(v ->
                 openDocumentPicker(REQUEST_PICK_VRM, "*/*"));
         findViewById(R.id.vrm_button_pick_image).setOnClickListener(v ->
                 openDocumentPicker(REQUEST_PICK_IMAGE, "image/*"));
-        findViewById(R.id.vrm_button_use_solid).setOnClickListener(v -> {
+        findViewById(R.id.vrm_button_background_mode_image).setOnClickListener(v -> {
+            WallpaperPrefs.setBackgroundMode(this, 1);
+            refreshFileLabels();
+            updateImageAdjustmentVisibility();
+            notifyUnity("OnBackgroundChanged", "");
+        });
+        findViewById(R.id.vrm_button_background_mode_solid).setOnClickListener(v -> {
             WallpaperPrefs.setBackgroundMode(this, 0);
             refreshFileLabels();
             updateImageAdjustmentVisibility();
@@ -693,6 +891,192 @@ public class MainActivity extends Activity {
         backgroundModeText.setText(backgroundMode == 0
                 ? R.string.vrm_solid_background_mode
                 : R.string.vrm_image_background_mode);
+
+        String backgroundImagePath = WallpaperPrefs.getBackgroundImagePath(this);
+        String backgroundImageLabel = backgroundImagePath.isEmpty()
+                ? getString(R.string.vrm_no_image_selected)
+                : new File(backgroundImagePath).getName();
+        if (backgroundImagePathText != null) {
+            backgroundImagePathText.setText(backgroundImageLabel);
+        }
+        updateBackgroundModeButtons();
+    }
+
+    private void updateBackgroundModeButtons() {
+        int backgroundMode = WallpaperPrefs.getBackgroundMode(this);
+        Button imageButton = findViewById(R.id.vrm_button_background_mode_image);
+        Button solidButton = findViewById(R.id.vrm_button_background_mode_solid);
+        Button pickImageButton = findViewById(R.id.vrm_button_pick_image);
+        styleToggleButton(imageButton, backgroundMode == 1, "#2CB67D");
+        styleToggleButton(solidButton, backgroundMode == 0, "#2CB67D");
+        if (pickImageButton != null) {
+            pickImageButton.setVisibility(backgroundMode == 1 ? View.VISIBLE : View.GONE);
+        }
+        if (backgroundImagePathText != null) {
+            backgroundImagePathText.setVisibility(backgroundMode == 1 ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private void styleToggleButton(Button button, boolean active, String accentColor) {
+        if (button == null) {
+            return;
+        }
+
+        button.setBackground(makeRoundDrawable(active ? accentColor : "#00000000", 100.0f));
+        button.setTextColor(active ? Color.WHITE : Color.parseColor("#99FFFFFF"));
+        button.setAllCaps(false);
+    }
+
+    private void bindDirectValueEditors() {
+        bindFloatEditor(distanceValueText, getString(R.string.vrm_label_distance), DISTANCE_MIN, DISTANCE_MAX,
+                () -> progressToDistance(distanceSeekBar.getProgress()),
+                value -> {
+                    distanceSeekBar.setProgress(distanceToProgress(value));
+                    WallpaperPrefs.setCameraDistance(this, value);
+                    notifyCameraChanged();
+                });
+        bindFloatEditor(heightValueText, getString(R.string.vrm_label_height), HEIGHT_MIN, HEIGHT_MAX,
+                () -> progressToHeight(heightSeekBar.getProgress()),
+                value -> {
+                    heightSeekBar.setProgress(heightToProgress(value));
+                    WallpaperPrefs.setCameraHeight(this, value);
+                    notifyCameraChanged();
+                });
+        bindIntEditor(angleValueText, getString(R.string.vrm_label_angle), ANGLE_MIN, ANGLE_MAX,
+                () -> progressToAngle(angleSeekBar.getProgress()),
+                value -> {
+                    angleSeekBar.setProgress(angleToProgress(value));
+                    WallpaperPrefs.setCameraAngle(this, value);
+                    notifyCameraChanged();
+                });
+        bindFloatEditor(renderScaleValueText, getString(R.string.vrm_label_render_scale), RENDER_SCALE_MIN, RENDER_SCALE_MAX,
+                () -> progressToRenderScale(renderScaleSeekBar.getProgress()),
+                value -> {
+                    renderScaleSeekBar.setProgress(renderScaleToProgress(value));
+                    WallpaperPrefs.setRenderScale(this, value);
+                    notifyRuntimeSettingsChanged();
+                });
+        bindFloatEditor(offsetXValueText, getString(R.string.vrm_label_offset_x), OFFSET_MIN, OFFSET_MAX,
+                () -> progressToOffset(offsetXSeekBar.getProgress()),
+                value -> {
+                    offsetXSeekBar.setProgress(offsetToProgress(value));
+                    WallpaperPrefs.setBackgroundImageOffsetX(this, value);
+                    notifyUnity("OnImageAdjustmentChanged", "");
+                });
+        bindFloatEditor(offsetYValueText, getString(R.string.vrm_label_offset_y), OFFSET_MIN, OFFSET_MAX,
+                () -> progressToOffset(offsetYSeekBar.getProgress()),
+                value -> {
+                    offsetYSeekBar.setProgress(offsetToProgress(value));
+                    WallpaperPrefs.setBackgroundImageOffsetY(this, value);
+                    notifyUnity("OnImageAdjustmentChanged", "");
+                });
+        bindFloatEditor(scaleValueText, getString(R.string.vrm_label_scale), SCALE_MIN, SCALE_MAX,
+                () -> progressToScale(scaleSeekBar.getProgress()),
+                value -> {
+                    scaleSeekBar.setProgress(scaleToProgress(value));
+                    WallpaperPrefs.setBackgroundImageScale(this, value);
+                    notifyUnity("OnImageAdjustmentChanged", "");
+                });
+        bindFloatEditor(modelOffsetXValueText, getString(R.string.vrm_label_model_offset_x), OFFSET_MIN, OFFSET_MAX,
+                () -> progressToOffset(modelOffsetXSeekBar.getProgress()),
+                value -> {
+                    modelOffsetXSeekBar.setProgress(offsetToProgress(value));
+                    WallpaperPrefs.setModelOffsetX(this, value);
+                    notifyRuntimeSettingsChanged();
+                });
+        bindFloatEditor(modelOffsetYValueText, getString(R.string.vrm_label_model_offset_y), OFFSET_MIN, OFFSET_MAX,
+                () -> progressToOffset(modelOffsetYSeekBar.getProgress()),
+                value -> {
+                    modelOffsetYSeekBar.setProgress(offsetToProgress(value));
+                    WallpaperPrefs.setModelOffsetY(this, value);
+                    notifyRuntimeSettingsChanged();
+                });
+        bindFloatEditor(modelOffsetZValueText, getString(R.string.vrm_label_model_offset_z), OFFSET_MIN, OFFSET_MAX,
+                () -> progressToOffset(modelOffsetZSeekBar.getProgress()),
+                value -> {
+                    modelOffsetZSeekBar.setProgress(offsetToProgress(value));
+                    WallpaperPrefs.setModelOffsetZ(this, value);
+                    notifyRuntimeSettingsChanged();
+                });
+        bindFloatEditor(modelScaleValueText, getString(R.string.vrm_label_model_scale), SCALE_MIN, SCALE_MAX,
+                () -> progressToScale(modelScaleSeekBar.getProgress()),
+                value -> {
+                    modelScaleSeekBar.setProgress(scaleToProgress(value));
+                    WallpaperPrefs.setModelScale(this, value);
+                    notifyRuntimeSettingsChanged();
+                });
+    }
+
+    private void bindFloatEditor(TextView target, String title, float min, float max, FloatProvider provider, FloatConsumer consumer) {
+        target.setOnClickListener(v -> showFloatInputDialog(title, provider.getValue(), min, max, consumer));
+    }
+
+    private void bindIntEditor(TextView target, String title, int min, int max, IntProvider provider, IntConsumer consumer) {
+        target.setOnClickListener(v -> showIntInputDialog(title, provider.getValue(), min, max, consumer));
+    }
+
+    private void showFloatInputDialog(String title, float current, float min, float max, FloatConsumer consumer) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setText(String.format(Locale.US, "%.2f", current));
+        input.setSelection(input.getText().length());
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
+        input.setTextColor(Color.WHITE);
+        input.setHintTextColor(Color.GRAY);
+        input.setBackgroundColor(Color.parseColor("#22FFFFFF"));
+        input.setPadding((int) dp(12), (int) dp(12), (int) dp(12), (int) dp(12));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(input)
+                .setPositiveButton(android.R.string.ok, (d, which) -> {
+                    try {
+                        float value = Float.parseFloat(input.getText().toString().trim());
+                        consumer.accept(clamp(value, min, max));
+                        loadCurrentSettings();
+                    } catch (NumberFormatException ignored) {
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(d -> showSoftKeyboard(input));
+        dialog.show();
+    }
+
+    private void showIntInputDialog(String title, int current, int min, int max, IntConsumer consumer) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setText(String.valueOf(current));
+        input.setSelection(input.getText().length());
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED);
+        input.setTextColor(Color.WHITE);
+        input.setHintTextColor(Color.GRAY);
+        input.setBackgroundColor(Color.parseColor("#22FFFFFF"));
+        input.setPadding((int) dp(12), (int) dp(12), (int) dp(12), (int) dp(12));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(input)
+                .setPositiveButton(android.R.string.ok, (d, which) -> {
+                    try {
+                        int value = Integer.parseInt(input.getText().toString().trim());
+                        consumer.accept(clamp(value, min, max));
+                        loadCurrentSettings();
+                    } catch (NumberFormatException ignored) {
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(d -> showSoftKeyboard(input));
+        dialog.show();
+    }
+
+    private void showSoftKeyboard(EditText input) {
+        input.requestFocus();
+        InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT);
+        }
     }
 
     private void updateColorPreview() {
@@ -1130,6 +1514,22 @@ public class MainActivity extends Activity {
         Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
     }
 
+    private interface FloatProvider {
+        float getValue();
+    }
+
+    private interface FloatConsumer {
+        void accept(float value);
+    }
+
+    private interface IntProvider {
+        int getValue();
+    }
+
+    private interface IntConsumer {
+        void accept(int value);
+    }
+
     private abstract static class SimpleSeekBarListener implements SeekBar.OnSeekBarChangeListener {
         @Override
         public void onStartTrackingTouch(SeekBar seekBar) {
@@ -1137,6 +1537,36 @@ public class MainActivity extends Activity {
 
         @Override
         public void onStopTrackingTouch(SeekBar seekBar) {
+        }
+    }
+
+    private final class SwipeDismissTouchListener implements View.OnTouchListener {
+        private float startY;
+        private float startTranslationY;
+
+        @Override
+        public boolean onTouch(View v, MotionEvent event) {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    startY = event.getRawY();
+                    startTranslationY = settingsSheet.getTranslationY();
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    float deltaY = Math.max(0f, event.getRawY() - startY);
+                    settingsSheet.setTranslationY(startTranslationY + deltaY);
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    float releaseDeltaY = Math.max(0f, event.getRawY() - startY);
+                    if (releaseDeltaY > dp(SHEET_DISMISS_THRESHOLD_DP)) {
+                        hideSettings();
+                    } else {
+                        settingsSheet.animate().translationY(0f).setDuration(160).start();
+                    }
+                    return true;
+                default:
+                    return true;
+            }
         }
     }
 }
