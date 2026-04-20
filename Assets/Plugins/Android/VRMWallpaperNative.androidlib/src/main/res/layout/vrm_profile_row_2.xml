@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/VrmSettingsCard"
+    android:orientation="vertical">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView android:layout_width="44dp" android:layout_height="wrap_content" android:text="@string/vrm_profile_slot_2" android:textColor="#3DA9FC" android:textSize="14sp" android:textStyle="bold" />
+        <Button android:id="@+id/vrm_button_save_profile_2" style="@style/VrmSettingsWideAccentButton" android:layout_marginStart="8dp" android:text="@string/vrm_button_save" />
+        <Button android:id="@+id/vrm_button_load_profile_2" style="@style/VrmSettingsWideGhostButtonInline" android:layout_marginStart="8dp" android:text="@string/vrm_button_load" />
+    </LinearLayout>
+    <TextView
+        android:id="@+id/vrm_text_profile_summary_2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:lineSpacingExtra="2dp"
+        android:text="@string/vrm_profile_empty"
+        android:textColor="#AAFFFFFF"
+        android:textSize="11sp" />
+</LinearLayout>

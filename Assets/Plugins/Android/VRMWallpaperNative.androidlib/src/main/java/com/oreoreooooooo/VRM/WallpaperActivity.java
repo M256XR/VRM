@@ -2,10 +2,6 @@ package com.oreoreooooooo.VRM;
 
 import android.annotation.TargetApi;
 import android.app.WallpaperColors;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Build;
@@ -15,20 +11,10 @@ import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.WindowInsets;
 
-import com.unity3d.player.UnityPlayer;
-
-class MyUnityPlayer extends UnityPlayer {
-    MyUnityPlayer(Context context) {
-        super(context);
-    }
-}
-
 public class WallpaperActivity extends WallpaperService {
     private static final String TAG = "VRMWallpaper";
-    private static final String ACTION_RELOAD_VRM = "com.oreoreooooooo.VRM.RELOAD_VRM";
 
-    private MyUnityPlayer unityPlayer;
-    private BroadcastReceiver reloadReceiver;
+    private UnityRuntimeHost unityHost;
     private int visibleSurfaces;
 
     @Override
@@ -36,25 +22,12 @@ public class WallpaperActivity extends WallpaperService {
         ContextHolder.setContext(this);
         super.onCreate();
 
-        unityPlayer = new MyUnityPlayer(getApplicationContext());
-        registerReloadReceiver();
+        unityHost = UnityRuntimeHost.get(this);
         Log.d(TAG, "Wallpaper service created");
     }
 
     @Override
     public void onDestroy() {
-        if (reloadReceiver != null) {
-            try {
-                unregisterReceiver(reloadReceiver);
-            } catch (Exception exception) {
-                Log.w(TAG, "Failed to unregister reload receiver", exception);
-            }
-        }
-
-        if (unityPlayer != null) {
-            unityPlayer.quit();
-        }
-
         super.onDestroy();
         Log.d(TAG, "Wallpaper service destroyed");
     }
@@ -67,47 +40,25 @@ public class WallpaperActivity extends WallpaperService {
     @Override
     public void onLowMemory() {
         super.onLowMemory();
-        if (unityPlayer != null) {
-            unityPlayer.lowMemory();
+        if (unityHost != null) {
+            unityHost.lowMemory();
         }
     }
 
     @Override
     public void onTrimMemory(int level) {
         super.onTrimMemory(level);
-        if (level == TRIM_MEMORY_RUNNING_CRITICAL && unityPlayer != null) {
-            unityPlayer.lowMemory();
+        if (level == TRIM_MEMORY_RUNNING_CRITICAL && unityHost != null) {
+            unityHost.lowMemory();
         }
     }
 
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        if (unityPlayer != null) {
-            unityPlayer.configurationChanged(newConfig);
+        if (unityHost != null) {
+            unityHost.configurationChanged(newConfig);
         }
-    }
-
-    private void registerReloadReceiver() {
-        reloadReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                if (intent == null || !ACTION_RELOAD_VRM.equals(intent.getAction())) {
-                    return;
-                }
-
-                android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
-                handler.post(() -> UnityPlayer.UnitySendMessage("VRMLoader", "ReloadVRM", ""));
-            }
-        };
-
-        IntentFilter filter = new IntentFilter(ACTION_RELOAD_VRM);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(reloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-            return;
-        }
-
-        registerReceiver(reloadReceiver, filter);
     }
 
     private int getWallpaperColor() {
@@ -147,13 +98,21 @@ public class WallpaperActivity extends WallpaperService {
         public void onSurfaceCreated(SurfaceHolder surfaceHolder) {
             super.onSurfaceCreated(surfaceHolder);
             holder = surfaceHolder;
+            UnityRuntimeHost.get(WallpaperActivity.this).setWallpaperSurface(holder.getSurface());
         }
 
         @Override
         public void onSurfaceChanged(SurfaceHolder surfaceHolder, int format, int width, int height) {
             super.onSurfaceChanged(surfaceHolder, format, width, height);
             holder = surfaceHolder;
-            unityPlayer.displayChanged(0, holder.getSurface());
+            UnityRuntimeHost.get(WallpaperActivity.this).setWallpaperSurface(holder.getSurface());
+        }
+
+        @Override
+        public void onSurfaceDestroyed(SurfaceHolder surfaceHolder) {
+            UnityRuntimeHost.get(WallpaperActivity.this).clearWallpaperSurface(surfaceHolder.getSurface());
+            holder = null;
+            super.onSurfaceDestroyed(surfaceHolder);
         }
 
         @Override
@@ -163,25 +122,22 @@ public class WallpaperActivity extends WallpaperService {
             if (visible) {
                 visibleSurfaces++;
                 if (holder != null) {
-                    unityPlayer.displayChanged(0, holder.getSurface());
+                    UnityRuntimeHost.get(WallpaperActivity.this).setWallpaperSurface(holder.getSurface());
                 }
-                unityPlayer.windowFocusChanged(true);
-                unityPlayer.resume();
+                UnityRuntimeHost.get(WallpaperActivity.this).setWallpaperVisible(true);
                 return;
             }
 
             visibleSurfaces = Math.max(visibleSurfaces - 1, 0);
             if (visibleSurfaces == 0) {
-                unityPlayer.displayChanged(0, null);
-                unityPlayer.windowFocusChanged(false);
-                unityPlayer.pause();
+                UnityRuntimeHost.get(WallpaperActivity.this).setWallpaperVisible(false);
             }
         }
 
         @Override
         public void onTouchEvent(MotionEvent event) {
             super.onTouchEvent(event);
-            unityPlayer.injectEvent(event);
+            UnityRuntimeHost.get(WallpaperActivity.this).injectEvent(event);
         }
     }
 }

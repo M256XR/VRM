@@ -14,10 +14,12 @@ using VRC.SDK3.Dynamics.PhysBone.Components;
 public class PhysBoneTouchHandler : MonoBehaviour
 {
     [SerializeField] private bool enableExperimentalTouch = true;
+    [SerializeField] private bool enableVerboseLogging = false;
     [SerializeField] private bool forceAllowGrabbing = true;
     [SerializeField] private bool createManagerIfMissing = true;
-    [SerializeField] private float fallbackGrabRadius = 0.12f;
-    [SerializeField] private bool showDebugSphere = true;
+    [SerializeField] private float fallbackGrabRadius = 0f;
+    [SerializeField] private float directGrabMaxScreenDistance = 32f;
+    [SerializeField] private bool showDebugSphere = false;
     [SerializeField] private float debugSphereSize = 0.035f;
 
     private const string LOG_FILE = "physbone_touch.log";
@@ -27,25 +29,34 @@ public class PhysBoneTouchHandler : MonoBehaviour
     private static readonly FieldInfo ManagerInstanceField = ManagerType?.GetField("Inst", BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance);
     private static readonly MethodInfo AttemptRayGrabMethod = FindAttemptRayGrabMethod();
     private static readonly MethodInfo AttemptSphereGrabMethod = FindAttemptSphereGrabMethod();
+    private static readonly MethodInfo AttemptChainGrabMethod = FindAttemptChainGrabMethod();
     private static readonly MethodInfo ReleaseGrabMethod = FindReleaseGrabMethod();
     private static readonly MethodInfo UpdateGrabsMethod = ManagerType?.GetMethod("UpdateGrabs", BindingFlags.Public | BindingFlags.Instance);
     private static readonly MethodInfo AddPhysBoneMethod = ManagerType?.GetMethod("AddPhysBone", BindingFlags.Public | BindingFlags.Instance);
     private static readonly MethodInfo HasPhysBoneMethod = ManagerType?.GetMethod("HasPhysBone", BindingFlags.Public | BindingFlags.Instance);
+    private static readonly MethodInfo ManagerAwakeMethod = ManagerType?.GetMethod("Awake", BindingFlags.NonPublic | BindingFlags.Instance);
     private static readonly MethodInfo InitManagerMethod = ManagerType?.GetMethod("Init", BindingFlags.Public | BindingFlags.Instance);
     private static readonly MethodInfo AddChainsMethod = ManagerType?.GetMethod("AddChains", BindingFlags.NonPublic | BindingFlags.Instance);
     private static readonly MethodInfo GetChainsMethod = ManagerType?.GetMethod("GetChains", BindingFlags.Public | BindingFlags.Instance);
+    private static readonly MethodInfo GetOrCreateRootMethod = FindGetOrCreateRootMethod();
+    private static readonly FieldInfo EditorInfoField = ManagerType?.GetField("editorInfo", BindingFlags.Public | BindingFlags.Instance);
+    private static readonly FieldInfo HasReportedCriticalErrorField = ManagerType?.GetField("hasReportedCriticalError", BindingFlags.NonPublic | BindingFlags.Instance);
+    private static readonly FieldInfo RootsToUpdateField = ManagerType?.GetField("rootsToUpdate", BindingFlags.NonPublic | BindingFlags.Instance);
     private static readonly FieldInfo HasInitField = ManagerType?.GetField("hasInit", BindingFlags.NonPublic | BindingFlags.Instance);
     private static readonly FieldInfo CompsToAddField = ManagerType?.GetField("compsToAdd", BindingFlags.NonPublic | BindingFlags.Instance);
     private static readonly Type PhysBoneRootType = Type.GetType("VRC.Dynamics.PhysBoneRoot, VRC.Dynamics");
     private static readonly FieldInfo PhysBoneRootField = typeof(VRCPhysBoneBase).GetField("root", BindingFlags.NonPublic | BindingFlags.Instance);
     private static readonly FieldInfo PhysBoneRootChainCountField = PhysBoneRootType?.GetField("chainCount", BindingFlags.NonPublic | BindingFlags.Instance);
     private static readonly MethodInfo PhysBoneRootStartMethod = PhysBoneRootType?.GetMethod("Start", BindingFlags.Public | BindingFlags.Instance);
+    private static readonly MethodInfo PhysBoneOnEnableMethod = typeof(VRCPhysBoneBase).GetMethod("OnEnable", BindingFlags.NonPublic | BindingFlags.Instance);
+    private static readonly MethodInfo PhysBoneStartMethod = typeof(VRCPhysBoneBase).GetMethod("Start", BindingFlags.NonPublic | BindingFlags.Instance);
     private static readonly FieldInfo GrabGlobalPositionField = ManagerType?.GetNestedType("Grab", BindingFlags.Public | BindingFlags.NonPublic)
         ?.GetField("globalPosition", BindingFlags.Public | BindingFlags.Instance);
 
     private Camera mainCamera;
     private GameObject boundAvatar;
     private GameObject registeredAvatar;
+    private bool registrationFailed;
     private Bounds avatarBounds;
     private object physBoneManager;
     private Component physBoneRoot;
@@ -56,7 +67,10 @@ public class PhysBoneTouchHandler : MonoBehaviour
 
     private void Start()
     {
-        DebugLogger.InitLog(LOG_FILE);
+        if (!System.IO.File.Exists(DebugLogger.GetLogPath(LOG_FILE)))
+        {
+            DebugLogger.InitLog(LOG_FILE);
+        }
         DebugLogger.LogSeparator(LOG_FILE, "PhysBoneTouchHandler Start");
         if (!enableExperimentalTouch)
         {
@@ -65,7 +79,7 @@ public class PhysBoneTouchHandler : MonoBehaviour
             return;
         }
 
-        DebugLogger.Log(LOG_FILE, $"PhysBoneManager={ManagerType != null} AttemptRayGrab={AttemptRayGrabMethod != null} AttemptSphereGrab={AttemptSphereGrabMethod != null} ReleaseGrab={ReleaseGrabMethod != null} AddPhysBone={AddPhysBoneMethod != null} AddChains={AddChainsMethod != null} InitManager={InitManagerMethod != null} PhysBoneRoot={PhysBoneRootType != null} RootField={PhysBoneRootField != null} GrabGlobalPosition={GrabGlobalPositionField != null}");
+        DebugLogger.Log(LOG_FILE, $"PhysBoneManager={ManagerType != null} AttemptRayGrab={AttemptRayGrabMethod != null} AttemptSphereGrab={AttemptSphereGrabMethod != null} AttemptChainGrab={AttemptChainGrabMethod != null} ReleaseGrab={ReleaseGrabMethod != null} AddPhysBone={AddPhysBoneMethod != null} AddChains={AddChainsMethod != null} GetOrCreateRoot={GetOrCreateRootMethod != null} ManagerAwake={ManagerAwakeMethod != null} InitManager={InitManagerMethod != null} PhysBoneRoot={PhysBoneRootType != null} RootField={PhysBoneRootField != null} RootFieldType={PhysBoneRootField?.FieldType.FullName} PhysBoneOnEnable={PhysBoneOnEnableMethod != null} PhysBoneStart={PhysBoneStartMethod != null} GrabGlobalPosition={GrabGlobalPositionField != null}");
 
         if (showDebugSphere)
         {
@@ -99,7 +113,7 @@ public class PhysBoneTouchHandler : MonoBehaviour
             UpdateGrab(Input.mousePosition);
         }
 
-        if (Input.GetMouseButtonUp(0))
+        if (Input.GetMouseButtonUp(0) || (!Input.GetMouseButton(0) && activeGrab != null))
         {
             ReleaseGrab();
         }
@@ -149,105 +163,106 @@ public class PhysBoneTouchHandler : MonoBehaviour
 
     private void TryRegisterAvatarPhysBones()
     {
-        if (boundAvatar == null || boundAvatar == registeredAvatar || physBoneManager == null || AddPhysBoneMethod == null)
+        if (boundAvatar == null || boundAvatar == registeredAvatar || registrationFailed || physBoneManager == null || AddPhysBoneMethod == null)
         {
             return;
         }
 
-        InitManagerIfNeeded("before register");
-
-        VRCPhysBone[] physBones = boundAvatar.GetComponentsInChildren<VRCPhysBone>(true);
-        int added = 0;
-        int enabled = 0;
-        int roots = 0;
-        int rootFieldBefore = 0;
-        int rootFieldAfter = 0;
-        int hasAfterAdd = 0;
-        int addedAfterRoot = 0;
-        int hasAfterRoot = 0;
-        int nonZeroChainId = 0;
-        int totalBones = 0;
-        foreach (VRCPhysBone physBone in physBones)
+        try
         {
-            if (physBone == null)
+            InitManagerIfNeeded("before register");
+            StartPhysBoneRoot();
+
+            VRCPhysBone[] physBones = boundAvatar.GetComponentsInChildren<VRCPhysBone>(true);
+            int added = 0;
+            int enabled = 0;
+            int roots = 0;
+            int rootFieldBefore = 0;
+            int rootFieldAfter = 0;
+            int hasAfterAdd = 0;
+            int nonZeroChainId = 0;
+            int totalBones = 0;
+            foreach (VRCPhysBone physBone in physBones)
             {
-                continue;
+                if (physBone == null)
+                {
+                    continue;
+                }
+
+                if (physBone.enabled)
+                {
+                    enabled++;
+                }
+
+                if (physBone.GetRootTransform() != null)
+                {
+                    roots++;
+                }
+
+                if (PhysBoneRootField != null && PhysBoneRootField.GetValue(physBone) != null)
+                {
+                    rootFieldBefore++;
+                }
+
+                try
+                {
+                    AssignPhysBoneRoot(physBone);
+
+                    physBone.InitParameters();
+                    physBone.InitTransforms(true);
+                    InvokePhysBoneLifecycle(physBone);
+                }
+                catch (Exception exception)
+                {
+                    DebugLogger.Log(LOG_FILE, $"PhysBone init failed for {physBone.name}: {exception.GetBaseException().GetType().Name}: {exception.GetBaseException().Message}");
+                    throw;
+                }
+
+                bool hasPhysBone = false;
+                if (HasPhysBoneMethod != null)
+                {
+                    hasPhysBone = (bool)HasPhysBoneMethod.Invoke(physBoneManager, new object[] { physBone });
+                }
+
+                if (!hasPhysBone)
+                {
+                    AddPhysBoneMethod.Invoke(physBoneManager, new object[] { physBone });
+                    added++;
+                }
+
+                if (HasPhysBoneMethod != null && (bool)HasPhysBoneMethod.Invoke(physBoneManager, new object[] { physBone }))
+                {
+                    hasAfterAdd++;
+                }
+
+                if (physBone.chainId != default)
+                {
+                    nonZeroChainId++;
+                }
+
+                if (physBone.bones != null)
+                {
+                    totalBones += physBone.bones.Count;
+                }
+
+                if (PhysBoneRootField != null && PhysBoneRootField.GetValue(physBone) != null)
+                {
+                    rootFieldAfter++;
+                }
             }
 
-            if (physBone.enabled)
-            {
-                enabled++;
-            }
+            LogVerbose($"After AddPhysBone: added={added} hasAfterAdd={hasAfterAdd} enabled={enabled} roots={roots} rootBefore={rootFieldBefore} rootAfter={rootFieldAfter} nonZeroChainId={nonZeroChainId} totalBones={totalBones} compsToAdd={GetCollectionCount(CompsToAddField)} hasInit={GetManagerHasInit()} chains={CountChains()}");
+            TryForceAddChains();
 
-            if (physBone.GetRootTransform() != null)
-            {
-                roots++;
-            }
-
-            if (PhysBoneRootField != null && PhysBoneRootField.GetValue(physBone) != null)
-            {
-                rootFieldBefore++;
-            }
-
-            physBone.InitParameters();
-            physBone.InitTransforms(true);
-
-            bool hasPhysBone = false;
-            if (HasPhysBoneMethod != null)
-            {
-                hasPhysBone = (bool)HasPhysBoneMethod.Invoke(physBoneManager, new object[] { physBone });
-            }
-
-            if (!hasPhysBone)
-            {
-                AddPhysBoneMethod.Invoke(physBoneManager, new object[] { physBone });
-                added++;
-            }
-
-            if (HasPhysBoneMethod != null && (bool)HasPhysBoneMethod.Invoke(physBoneManager, new object[] { physBone }))
-            {
-                hasAfterAdd++;
-            }
-
-            if (physBone.chainId != 0UL)
-            {
-                nonZeroChainId++;
-            }
-
-            if (physBone.bones != null)
-            {
-                totalBones += physBone.bones.Count;
-            }
-
-            if (physBoneRoot != null && PhysBoneRootField != null && PhysBoneRootField.GetValue(physBone) == null)
-            {
-                PhysBoneRootField.SetValue(physBone, physBoneRoot);
-            }
-
-            if (PhysBoneRootField != null && PhysBoneRootField.GetValue(physBone) != null)
-            {
-                rootFieldAfter++;
-            }
-
-            if (HasPhysBoneMethod != null && !(bool)HasPhysBoneMethod.Invoke(physBoneManager, new object[] { physBone }))
-            {
-                AddPhysBoneMethod.Invoke(physBoneManager, new object[] { physBone });
-                addedAfterRoot++;
-            }
-
-            if (HasPhysBoneMethod != null && (bool)HasPhysBoneMethod.Invoke(physBoneManager, new object[] { physBone }))
-            {
-                hasAfterRoot++;
-            }
+            registeredAvatar = boundAvatar;
+            DebugLogger.Log(LOG_FILE, $"Registered avatar physBones to manager: total={physBones.Length} added={added} chains={CountChains()} rootChainCount={GetPhysBoneRootChainCount()}");
+            StartCoroutine(LogChainCountAfterManagerUpdate());
         }
-
-        DebugLogger.Log(LOG_FILE, $"After AddPhysBone: added={added} hasAfterAdd={hasAfterAdd} addedAfterRoot={addedAfterRoot} hasAfterRoot={hasAfterRoot} enabled={enabled} roots={roots} rootBefore={rootFieldBefore} rootAfter={rootFieldAfter} nonZeroChainId={nonZeroChainId} totalBones={totalBones} compsToAdd={GetCollectionCount(CompsToAddField)} hasInit={GetManagerHasInit()} chains={CountChains()}");
-        TryForceAddChains();
-        PhysBoneRootStartMethod?.Invoke(physBoneRoot, null);
-
-        registeredAvatar = boundAvatar;
-        DebugLogger.Log(LOG_FILE, $"Registered avatar physBones to manager: total={physBones.Length} added={added} chains={CountChains()} rootChainCount={GetPhysBoneRootChainCount()}");
-        StartCoroutine(LogChainCountAfterManagerUpdate());
+        catch (Exception exception)
+        {
+            registrationFailed = true;
+            DebugLogger.Log(LOG_FILE, $"Register avatar physBones failed: {exception.GetBaseException().GetType().Name}: {exception.GetBaseException().Message}");
+        }
     }
 
     private void InitManagerIfNeeded(string reason)
@@ -260,11 +275,105 @@ public class PhysBoneTouchHandler : MonoBehaviour
         try
         {
             InitManagerMethod.Invoke(physBoneManager, null);
-            DebugLogger.Log(LOG_FILE, $"PhysBoneManager.Init called ({reason}), hasInit={GetManagerHasInit()} compsToAdd={GetCollectionCount(CompsToAddField)} chains={CountChains()}");
+            LogVerbose($"PhysBoneManager.Init called ({reason}), hasInit={GetManagerHasInit()} enabled={IsManagerEnabled()} compsToAdd={GetCollectionCount(CompsToAddField)} rootsToUpdate={GetCollectionCount(RootsToUpdateField)} chains={CountChains()} editorInfo={DescribeEditorInfo()} critical={GetManagerCriticalState()}");
         }
         catch (Exception exception)
         {
             DebugLogger.Log(LOG_FILE, $"PhysBoneManager.Init failed ({reason}): {exception.GetBaseException().Message}");
+        }
+    }
+
+    private void StartPhysBoneRoot()
+    {
+        if (physBoneRoot == null || PhysBoneRootStartMethod == null)
+        {
+            return;
+        }
+
+        try
+        {
+            PhysBoneRootStartMethod.Invoke(physBoneRoot, null);
+            LogVerbose($"PhysBoneRoot.Start called, rootChainCount={GetPhysBoneRootChainCount()}");
+        }
+        catch (Exception exception)
+        {
+            DebugLogger.Log(LOG_FILE, $"PhysBoneRoot.Start failed: {exception.GetBaseException().Message}");
+        }
+    }
+
+    private void AssignPhysBoneRoot(VRCPhysBone physBone)
+    {
+        if (PhysBoneRootField == null)
+        {
+            return;
+        }
+
+        object currentRoot = PhysBoneRootField.GetValue(physBone);
+        if (currentRoot != null)
+        {
+            return;
+        }
+
+        object root = CreateCompatiblePhysBoneRoot(physBone);
+        if (root == null)
+        {
+            return;
+        }
+
+        PhysBoneRootField.SetValue(physBone, root);
+    }
+
+    private object CreateCompatiblePhysBoneRoot(VRCPhysBone physBone)
+    {
+        Type rootFieldType = PhysBoneRootField?.FieldType;
+        if (rootFieldType == null)
+        {
+            return null;
+        }
+
+        Transform rootTransform = physBone.GetRootTransform();
+        if (rootTransform == null)
+        {
+            rootTransform = physBone.rootTransform != null ? physBone.rootTransform : physBone.transform;
+        }
+
+        if (GetOrCreateRootMethod != null && physBoneManager != null)
+        {
+            try
+            {
+                object managerRoot = GetOrCreateRootMethod.Invoke(physBoneManager, new object[] { rootTransform, true, false });
+                if (managerRoot != null && rootFieldType.IsInstanceOfType(managerRoot))
+                {
+                    return managerRoot;
+                }
+
+                DebugLogger.Log(LOG_FILE, $"GetOrCreateRoot returned incompatible root for {physBone.name}: returned={managerRoot?.GetType().FullName} expected={rootFieldType.FullName}");
+            }
+            catch (Exception exception)
+            {
+                DebugLogger.Log(LOG_FILE, $"GetOrCreateRoot failed for {physBone.name}: {exception.GetBaseException().GetType().Name}: {exception.GetBaseException().Message}");
+            }
+        }
+
+        if (physBoneRoot != null && rootFieldType.IsInstanceOfType(physBoneRoot))
+        {
+            return physBoneRoot;
+        }
+
+        DebugLogger.Log(LOG_FILE, $"No compatible PhysBone root for {physBone.name}: expected={rootFieldType.FullName} componentRoot={physBoneRoot?.GetType().FullName}");
+        return null;
+    }
+
+    private void InvokePhysBoneLifecycle(VRCPhysBone physBone)
+    {
+        try
+        {
+            PhysBoneOnEnableMethod?.Invoke(physBone, null);
+            PhysBoneStartMethod?.Invoke(physBone, null);
+        }
+        catch (Exception exception)
+        {
+            DebugLogger.Log(LOG_FILE, $"PhysBone lifecycle invoke failed for {physBone.name}: {exception.GetBaseException().Message}");
         }
     }
 
@@ -277,8 +386,9 @@ public class PhysBoneTouchHandler : MonoBehaviour
 
         try
         {
+            LogVerbose($"Before forced AddChains: hasInit={GetManagerHasInit()} enabled={IsManagerEnabled()} compsToAdd={GetCollectionCount(CompsToAddField)} rootsToUpdate={GetCollectionCount(RootsToUpdateField)} chains={CountChains()} editorInfo={DescribeEditorInfo()} critical={GetManagerCriticalState()}");
             AddChainsMethod.Invoke(physBoneManager, null);
-            DebugLogger.Log(LOG_FILE, $"Forced PhysBoneManager.AddChains, hasInit={GetManagerHasInit()} compsToAdd={GetCollectionCount(CompsToAddField)} chains={CountChains()} rootChainCount={GetPhysBoneRootChainCount()}");
+            LogVerbose($"Forced PhysBoneManager.AddChains, hasInit={GetManagerHasInit()} enabled={IsManagerEnabled()} compsToAdd={GetCollectionCount(CompsToAddField)} rootsToUpdate={GetCollectionCount(RootsToUpdateField)} chains={CountChains()} rootChainCount={GetPhysBoneRootChainCount()} editorInfo={DescribeEditorInfo()} critical={GetManagerCriticalState()}");
         }
         catch (Exception exception)
         {
@@ -291,7 +401,7 @@ public class PhysBoneTouchHandler : MonoBehaviour
         for (int i = 1; i <= 5; i++)
         {
             yield return null;
-            DebugLogger.Log(LOG_FILE, $"PhysBoneManager chains after {i} frame(s): {CountChains()}");
+            LogVerbose($"PhysBoneManager chains after {i} frame(s): {CountChains()}");
         }
     }
 
@@ -299,7 +409,7 @@ public class PhysBoneTouchHandler : MonoBehaviour
     {
         if (physBoneManager == null || AttemptRayGrabMethod == null)
         {
-            DebugLogger.Log(LOG_FILE, "BeginGrab skipped: PhysBoneManager or AttemptGrab is missing");
+            LogVerbose("BeginGrab skipped: PhysBoneManager or AttemptGrab is missing");
             return;
         }
 
@@ -310,25 +420,97 @@ public class PhysBoneTouchHandler : MonoBehaviour
         activeGrab = AttemptRayGrabMethod.Invoke(physBoneManager, args);
         if (activeGrab == null)
         {
-            activeGrab = TryFallbackSphereGrab(screenPosition, ray);
+            activeGrab = TryDirectBoneGrab(screenPosition);
+            if (activeGrab == null && fallbackGrabRadius > 0f)
+            {
+                activeGrab = TryFallbackSphereGrab(screenPosition, ray);
+            }
+
             if (activeGrab == null)
             {
-                DebugLogger.Log(LOG_FILE, "AttemptGrab returned null");
+                LogVerbose("AttemptGrab returned null (ray/direct missed)");
                 return;
             }
         }
-
-        dragPosition = (Vector3)args[2];
-        if (dragPosition == Vector3.zero && TryGetTouchWorldPosition(screenPosition, ray, out Vector3 fallbackPosition))
+        else
         {
-            dragPosition = fallbackPosition;
+            dragPosition = (Vector3)args[2];
+            if (dragPosition == Vector3.zero && TryGetTouchWorldPosition(screenPosition, ray, out Vector3 fallbackPosition))
+            {
+                dragPosition = fallbackPosition;
+            }
         }
 
         dragPlane = new Plane(mainCamera.transform.forward, dragPosition);
         SetGrabGlobalPosition(dragPosition);
         UpdateGrabsMethod?.Invoke(physBoneManager, null);
 
-        DebugLogger.Log(LOG_FILE, $"Grab started: {DescribeGrab(activeGrab)} hit={dragPosition}");
+        LogVerbose($"Grab started: {DescribeGrab(activeGrab)} hit={dragPosition}");
+    }
+
+    private object TryDirectBoneGrab(Vector2 screenPosition)
+    {
+        if (AttemptChainGrabMethod == null || boundAvatar == null)
+        {
+            return null;
+        }
+
+        VRCPhysBone[] physBones = boundAvatar.GetComponentsInChildren<VRCPhysBone>(true);
+        float bestDistanceSq = directGrabMaxScreenDistance * directGrabMaxScreenDistance;
+        VRCPhysBone bestPhysBone = null;
+        int bestBoneIndex = -1;
+        Vector3 bestWorldPosition = default;
+
+        foreach (VRCPhysBone physBone in physBones)
+        {
+            if (physBone == null || !physBone.enabled || physBone.bones == null || physBone.chainId == default)
+            {
+                continue;
+            }
+
+            for (int i = 0; i < physBone.bones.Count; i++)
+            {
+                Transform boneTransform = physBone.bones[i].transform;
+                if (boneTransform == null)
+                {
+                    continue;
+                }
+
+                Vector3 boneScreenPosition = mainCamera.WorldToScreenPoint(boneTransform.position);
+                if (boneScreenPosition.z <= 0f)
+                {
+                    continue;
+                }
+
+                float distanceSq = ((Vector2)boneScreenPosition - screenPosition).sqrMagnitude;
+                if (distanceSq >= bestDistanceSq)
+                {
+                    continue;
+                }
+
+                bestDistanceSq = distanceSq;
+                bestPhysBone = physBone;
+                bestBoneIndex = i;
+                bestWorldPosition = boneTransform.position;
+            }
+        }
+
+        if (bestPhysBone == null)
+        {
+            LogVerbose($"Direct AttemptGrab skipped: no bone within {directGrabMaxScreenDistance:F1}px");
+            return null;
+        }
+
+        object grab = AttemptChainGrabMethod.Invoke(physBoneManager, new object[] { GRABBER_ID, bestPhysBone.chainId, bestBoneIndex });
+        if (grab == null)
+        {
+            LogVerbose($"Direct AttemptGrab returned null: physBone={bestPhysBone.name} bone={bestBoneIndex} distance={Mathf.Sqrt(bestDistanceSq):F1}px chainId={bestPhysBone.chainId}");
+            return null;
+        }
+
+        dragPosition = bestWorldPosition;
+        LogVerbose($"Direct AttemptGrab succeeded: physBone={bestPhysBone.name} bone={bestBoneIndex} distance={Mathf.Sqrt(bestDistanceSq):F1}px chainId={bestPhysBone.chainId}");
+        return grab;
     }
 
     private object TryFallbackSphereGrab(Vector2 screenPosition, Ray ray)
@@ -342,7 +524,7 @@ public class PhysBoneTouchHandler : MonoBehaviour
         if (grab != null)
         {
             dragPosition = grabPosition;
-            DebugLogger.Log(LOG_FILE, $"Sphere AttemptGrab succeeded at {grabPosition} radius={fallbackGrabRadius}");
+            LogVerbose($"Sphere AttemptGrab succeeded at {grabPosition} radius={fallbackGrabRadius}");
         }
 
         return grab;
@@ -396,9 +578,24 @@ public class PhysBoneTouchHandler : MonoBehaviour
 
         try
         {
-            if (physBoneManager != null && ReleaseGrabMethod != null)
+            if (physBoneManager != null)
             {
-                ReleaseGrabMethod.Invoke(physBoneManager, new[] { activeGrab, false });
+                // Prefer the current ReleaseGrab(ChainId) overload when available.
+                FieldInfo chainIdField = activeGrab.GetType().GetField("chainId", BindingFlags.Public | BindingFlags.Instance);
+                if (chainIdField != null)
+                {
+                    object chainId = chainIdField.GetValue(activeGrab);
+                    MethodInfo releaseByChain = physBoneManager.GetType().GetMethod("ReleaseGrab",
+                        new[] { chainIdField.FieldType });
+                    if (releaseByChain != null)
+                    {
+                        releaseByChain.Invoke(physBoneManager, new[] { chainId });
+                    }
+                    else if (ReleaseGrabMethod != null)
+                    {
+                        ReleaseGrabMethod.Invoke(physBoneManager, new[] { activeGrab, (object)false });
+                    }
+                }
             }
         }
         catch (Exception exception)
@@ -406,7 +603,6 @@ public class PhysBoneTouchHandler : MonoBehaviour
             DebugLogger.Log(LOG_FILE, $"ReleaseGrab failed: {exception.GetBaseException().Message}");
         }
 
-        DebugLogger.Log(LOG_FILE, "Grab released");
         activeGrab = null;
     }
 
@@ -427,6 +623,8 @@ public class PhysBoneTouchHandler : MonoBehaviour
             return null;
         }
 
+        VrcSdkRuntimeDynamicsBootstrap.EnsureInitialized();
+
         object manager = null;
         if (ManagerInstanceField != null)
         {
@@ -445,10 +643,79 @@ public class PhysBoneTouchHandler : MonoBehaviour
             GameObject managerObject = new GameObject("PhysBoneManager");
             manager = managerObject.AddComponent(ManagerType);
             DontDestroyOnLoad(managerObject);
+            TryAssignManagerInstance(manager);
+            TryConfigureManagerForSdk(manager);
             DebugLogger.Log(LOG_FILE, "Created PhysBoneManager");
         }
 
         return manager;
+    }
+
+    private static void TryAssignManagerInstance(object manager)
+    {
+        if (manager == null || ManagerInstanceField == null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (ManagerInstanceField.IsStatic)
+            {
+                ManagerInstanceField.SetValue(null, manager);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static void TryConfigureManagerForSdk(object manager)
+    {
+        if (manager == null)
+        {
+            return;
+        }
+
+        try
+        {
+            Type type = manager.GetType();
+            PropertyInfo isSdkProperty = type.GetProperty("IsSDK", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (isSdkProperty != null && isSdkProperty.CanWrite)
+            {
+                isSdkProperty.SetValue(manager, true);
+            }
+            else
+            {
+                FieldInfo isSdkField = type.GetField("IsSDK", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                isSdkField?.SetValue(manager, true);
+            }
+
+            if (manager is Behaviour behaviour)
+            {
+                behaviour.enabled = true;
+            }
+
+            ManagerAwakeMethod?.Invoke(manager, null);
+            InitManagerMethod?.Invoke(manager, null);
+        }
+        catch
+        {
+        }
+    }
+
+
+    private void LogVerbose(string message)
+    {
+        if (enableVerboseLogging)
+        {
+            DebugLogger.Log(LOG_FILE, message);
+        }
+    }
+
+    public void SetVerboseLogging(bool enabled)
+    {
+        enableVerboseLogging = enabled;
     }
 
     private static Component EnsurePhysBoneRoot(GameObject avatarRoot)
@@ -489,6 +756,39 @@ public class PhysBoneTouchHandler : MonoBehaviour
         return -1;
     }
 
+    private object IsManagerEnabled()
+    {
+        return physBoneManager is Behaviour behaviour ? behaviour.enabled : "unknown";
+    }
+
+    private object GetManagerCriticalState()
+    {
+        return physBoneManager != null && HasReportedCriticalErrorField != null ? HasReportedCriticalErrorField.GetValue(physBoneManager) : "unknown";
+    }
+
+    private string DescribeEditorInfo()
+    {
+        if (physBoneManager == null || EditorInfoField == null)
+        {
+            return "unknown";
+        }
+
+        object editorInfo = EditorInfoField.GetValue(physBoneManager);
+        if (editorInfo == null)
+        {
+            return "null";
+        }
+
+        Type type = editorInfo.GetType();
+        return $"chains={GetFieldValue(type, editorInfo, "chainCount")},bones={GetFieldValue(type, editorInfo, "boneCount")},roots={GetFieldValue(type, editorInfo, "rootCount")},shapes={GetFieldValue(type, editorInfo, "shapeCount")},chainCap={GetFieldValue(type, editorInfo, "chainCapacity")},boneCap={GetFieldValue(type, editorInfo, "boneCapacity")},rootCap={GetFieldValue(type, editorInfo, "rootCapacity")}";
+    }
+
+    private static object GetFieldValue(Type type, object target, string name)
+    {
+        FieldInfo field = type.GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+        return field != null ? field.GetValue(target) : "missing";
+    }
+
     private object GetPhysBoneRootChainCount()
     {
         return physBoneRoot != null && PhysBoneRootChainCountField != null ? PhysBoneRootChainCountField.GetValue(physBoneRoot) : "unknown";
@@ -503,6 +803,17 @@ public class PhysBoneTouchHandler : MonoBehaviour
 
         int count = 0;
         object enumerable = GetChainsMethod.Invoke(physBoneManager, null);
+        if (enumerable is IEnumerator enumerator)
+        {
+            int enumeratorCount = 0;
+            while (enumerator.MoveNext())
+            {
+                enumeratorCount++;
+            }
+
+            return enumeratorCount;
+        }
+
         if (enumerable is IEnumerable chains)
         {
             foreach (object _ in chains)
@@ -569,6 +880,33 @@ public class PhysBoneTouchHandler : MonoBehaviour
         return null;
     }
 
+    private static MethodInfo FindAttemptChainGrabMethod()
+    {
+        if (ManagerType == null)
+        {
+            return null;
+        }
+
+        foreach (MethodInfo method in ManagerType.GetMethods(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (method.Name != "AttemptGrab")
+            {
+                continue;
+            }
+
+            ParameterInfo[] parameters = method.GetParameters();
+            if (parameters.Length == 3 &&
+                parameters[0].ParameterType == typeof(int) &&
+                parameters[1].ParameterType.FullName == "VRC.Dynamics.ChainId" &&
+                parameters[2].ParameterType == typeof(int))
+            {
+                return method;
+            }
+        }
+
+        return null;
+    }
+
     private static MethodInfo FindReleaseGrabMethod()
     {
         if (ManagerType == null)
@@ -588,6 +926,33 @@ public class PhysBoneTouchHandler : MonoBehaviour
             if (parameters.Length == 2 &&
                 parameters[0].ParameterType == grabType &&
                 parameters[1].ParameterType == typeof(bool))
+            {
+                return method;
+            }
+        }
+
+        return null;
+    }
+
+    private static MethodInfo FindGetOrCreateRootMethod()
+    {
+        if (ManagerType == null)
+        {
+            return null;
+        }
+
+        foreach (MethodInfo method in ManagerType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+        {
+            if (method.Name != "GetOrCreateRoot")
+            {
+                continue;
+            }
+
+            ParameterInfo[] parameters = method.GetParameters();
+            if (parameters.Length == 3 &&
+                parameters[0].ParameterType == typeof(Transform) &&
+                parameters[1].ParameterType == typeof(bool) &&
+                parameters[2].ParameterType == typeof(bool))
             {
                 return method;
             }
