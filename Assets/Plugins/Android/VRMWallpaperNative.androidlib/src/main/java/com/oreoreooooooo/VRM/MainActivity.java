@@ -71,6 +71,7 @@ public class MainActivity extends Activity {
     private View settingsOverlay;
     private View toggleButton;
     private SurfaceView previewSurfaceView;
+    private ColorWheelView colorWheelView;
     private View imageAdjustmentPanel;
     private View colorPreview;
     private View settingsSheet;
@@ -112,6 +113,7 @@ public class MainActivity extends Activity {
     private SeekBar redSeekBar;
     private SeekBar greenSeekBar;
     private SeekBar blueSeekBar;
+    private ColorValueSliderView colorValueSlider;
     private SeekBar offsetXSeekBar;
     private SeekBar offsetYSeekBar;
     private SeekBar scaleSeekBar;
@@ -459,6 +461,7 @@ public class MainActivity extends Activity {
         profileSummary3Text = findViewById(R.id.vrm_text_profile_summary_3);
 
         colorPreview = findViewById(R.id.vrm_view_color_preview);
+        colorWheelView = findViewById(R.id.vrm_color_wheel);
         imageAdjustmentPanel = findViewById(R.id.vrm_panel_image_adjustment);
 
         distanceSeekBar = findViewById(R.id.vrm_seek_distance);
@@ -467,6 +470,7 @@ public class MainActivity extends Activity {
         redSeekBar = findViewById(R.id.vrm_seek_red);
         greenSeekBar = findViewById(R.id.vrm_seek_green);
         blueSeekBar = findViewById(R.id.vrm_seek_blue);
+        colorValueSlider = findViewById(R.id.vrm_slider_color_value);
         offsetXSeekBar = findViewById(R.id.vrm_seek_offset_x);
         offsetYSeekBar = findViewById(R.id.vrm_seek_offset_y);
         scaleSeekBar = findViewById(R.id.vrm_seek_scale);
@@ -622,6 +626,27 @@ public class MainActivity extends Activity {
         greenSeekBar.setOnSeekBarChangeListener(colorListener);
         blueSeekBar.setOnSeekBarChangeListener(colorListener);
 
+        colorWheelView.setOnColorChangeListener((color, fromUser) -> {
+            if (!suppressUiCallbacks && fromUser) {
+                colorValueSlider.setHueSaturationValue(
+                        colorWheelView.getHue(),
+                        colorWheelView.getSaturation(),
+                        colorWheelView.getValue());
+                applyBackgroundColor(color, true, false);
+            }
+        });
+
+        colorValueSlider.setOnValueChangeListener((value, fromUser) -> {
+            colorWheelView.setValue(value);
+            if (!suppressUiCallbacks && fromUser) {
+                colorValueSlider.setHueSaturationValue(
+                        colorWheelView.getHue(),
+                        colorWheelView.getSaturation(),
+                        value);
+                applyBackgroundColor(colorWheelView.getColor(), true, false);
+            }
+        });
+
         hexColorEdit.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -638,14 +663,7 @@ public class MainActivity extends Activity {
                 if (hex.length() == 7 && hex.startsWith("#")) {
                     try {
                         int color = Color.parseColor(hex);
-                        suppressUiCallbacks = true;
-                        redSeekBar.setProgress(Color.red(color));
-                        greenSeekBar.setProgress(Color.green(color));
-                        blueSeekBar.setProgress(Color.blue(color));
-                        suppressUiCallbacks = false;
-                        updateColorPreview();
-                        saveBackgroundColor();
-                        notifyColorChanged();
+                        applyBackgroundColor(color, true);
                     } catch (IllegalArgumentException ignored) {
                     }
                 }
@@ -1118,6 +1136,10 @@ public class MainActivity extends Activity {
     }
 
     private void updateColorPreview() {
+        updateColorPreview(true);
+    }
+
+    private void updateColorPreview(boolean syncPicker) {
         int r = redSeekBar.getProgress();
         int g = greenSeekBar.getProgress();
         int b = blueSeekBar.getProgress();
@@ -1130,6 +1152,39 @@ public class MainActivity extends Activity {
             hexColorEdit.setText(hex);
             suppressUiCallbacks = false;
         }
+
+        if (syncPicker) {
+            syncColorPicker(color);
+        }
+    }
+
+    private void applyBackgroundColor(int color, boolean notifyUnity) {
+        applyBackgroundColor(color, notifyUnity, true);
+    }
+
+    private void applyBackgroundColor(int color, boolean notifyUnity, boolean syncPicker) {
+        suppressUiCallbacks = true;
+        redSeekBar.setProgress(Color.red(color));
+        greenSeekBar.setProgress(Color.green(color));
+        blueSeekBar.setProgress(Color.blue(color));
+        suppressUiCallbacks = false;
+
+        updateColorPreview(syncPicker);
+        saveBackgroundColor();
+        if (notifyUnity) {
+            notifyColorChanged();
+        }
+    }
+
+    private void syncColorPicker(int color) {
+        if (colorWheelView == null || colorValueSlider == null) {
+            return;
+        }
+
+        suppressUiCallbacks = true;
+        colorWheelView.setColor(color);
+        colorValueSlider.setColor(color);
+        suppressUiCallbacks = false;
     }
 
     private void updateImageAdjustmentVisibility() {

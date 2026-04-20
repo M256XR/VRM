@@ -59,6 +59,7 @@
     <string name="vrm_label_red">赤</string>
     <string name="vrm_label_green">緑</string>
     <string name="vrm_label_blue">青</string>
+    <string name="vrm_label_color_value">明るさ</string>
     <string name="vrm_label_fit_mode">表示方法</string>
     <string name="vrm_label_offset_x">背景X</string>
     <string name="vrm_label_offset_y">背景Y</string>

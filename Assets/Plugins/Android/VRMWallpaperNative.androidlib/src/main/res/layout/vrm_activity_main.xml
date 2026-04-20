@@ -377,6 +377,25 @@
                                     android:textSize="13sp" />
                             </LinearLayout>
 
+                            <com.oreoreooooooo.VRM.ColorWheelView
+                                android:id="@+id/vrm_color_wheel"
+                                android:layout_width="match_parent"
+                                android:layout_height="184dp"
+                                android:layout_marginTop="12dp" />
+
+                            <LinearLayout
+                                style="@style/VrmSettingsSliderRow"
+                                android:layout_marginTop="8dp">
+                                <TextView
+                                    style="@style/VrmSettingsSliderLabel"
+                                    android:text="@string/vrm_label_color_value" />
+                                <com.oreoreooooooo.VRM.ColorValueSliderView
+                                    android:id="@+id/vrm_slider_color_value"
+                                    android:layout_width="0dp"
+                                    android:layout_height="44dp"
+                                    android:layout_weight="1" />
+                            </LinearLayout>
+
                             <include layout="@layout/vrm_row_color_r" />
                             <include layout="@layout/vrm_row_color_g" />
                             <include layout="@layout/vrm_row_color_b" />
