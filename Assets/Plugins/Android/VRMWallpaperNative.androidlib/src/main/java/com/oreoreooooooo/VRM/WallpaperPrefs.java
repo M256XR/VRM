@@ -66,6 +66,60 @@ final class WallpaperPrefs {
     private WallpaperPrefs() {
     }
 
+    static final class ProfileSnapshot {
+        final String vrmPath;
+        final String vrmDisplayName;
+        final float cameraDistance;
+        final float cameraHeight;
+        final float cameraAngle;
+        final float backgroundColorRed;
+        final float backgroundColorGreen;
+        final float backgroundColorBlue;
+        final int backgroundMode;
+        final String backgroundImagePath;
+        final float renderScale;
+        final int targetFps;
+        final float modelOffsetX;
+        final float modelOffsetY;
+        final float modelOffsetZ;
+        final float modelScale;
+
+        private ProfileSnapshot(
+                String vrmPath,
+                String vrmDisplayName,
+                float cameraDistance,
+                float cameraHeight,
+                float cameraAngle,
+                float backgroundColorRed,
+                float backgroundColorGreen,
+                float backgroundColorBlue,
+                int backgroundMode,
+                String backgroundImagePath,
+                float renderScale,
+                int targetFps,
+                float modelOffsetX,
+                float modelOffsetY,
+                float modelOffsetZ,
+                float modelScale) {
+            this.vrmPath = vrmPath;
+            this.vrmDisplayName = vrmDisplayName;
+            this.cameraDistance = cameraDistance;
+            this.cameraHeight = cameraHeight;
+            this.cameraAngle = cameraAngle;
+            this.backgroundColorRed = backgroundColorRed;
+            this.backgroundColorGreen = backgroundColorGreen;
+            this.backgroundColorBlue = backgroundColorBlue;
+            this.backgroundMode = backgroundMode;
+            this.backgroundImagePath = backgroundImagePath;
+            this.renderScale = renderScale;
+            this.targetFps = targetFps;
+            this.modelOffsetX = modelOffsetX;
+            this.modelOffsetY = modelOffsetY;
+            this.modelOffsetZ = modelOffsetZ;
+            this.modelScale = modelScale;
+        }
+    }
+
     private static SharedPreferences prefs(Context context) {
         return context.getSharedPreferences(PREFS_NAME, PREFS_MODE);
     }
@@ -263,17 +317,67 @@ final class WallpaperPrefs {
     }
 
     static boolean hasProfileSlot(Context context, int slot) {
-        return prefs(context).contains(profileKey(slot, KEY_TARGET_FPS));
+        SharedPreferences sharedPreferences = prefs(context);
+        for (String key : SNAPSHOT_KEYS) {
+            if (sharedPreferences.contains(profileKey(slot, key))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static void saveProfileSlot(Context context, int slot) {
-        SharedPreferences sharedPreferences = prefs(context);
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-        Map<String, ?> allValues = sharedPreferences.getAll();
-        for (String key : SNAPSHOT_KEYS) {
-            putSnapshotValue(editor, profileKey(slot, key), allValues.get(key));
-        }
+        SharedPreferences.Editor editor = prefs(context).edit();
+        editor.putString(profileKey(slot, KEY_VRM_PATH), getVrmPath(context));
+        editor.putString(profileKey(slot, KEY_VRM_DISPLAY_NAME), getVrmDisplayName(context));
+        editor.putFloat(profileKey(slot, KEY_CAMERA_DISTANCE), getCameraDistance(context));
+        editor.putFloat(profileKey(slot, KEY_CAMERA_HEIGHT), getCameraHeight(context));
+        editor.putFloat(profileKey(slot, KEY_CAMERA_ANGLE), getCameraAngle(context));
+        editor.putFloat(profileKey(slot, KEY_BG_COLOR_R), getBackgroundColorRed(context));
+        editor.putFloat(profileKey(slot, KEY_BG_COLOR_G), getBackgroundColorGreen(context));
+        editor.putFloat(profileKey(slot, KEY_BG_COLOR_B), getBackgroundColorBlue(context));
+        editor.putInt(profileKey(slot, KEY_BG_MODE), getBackgroundMode(context));
+        editor.putString(profileKey(slot, KEY_BG_IMAGE_PATH), getBackgroundImagePath(context));
+        editor.putInt(profileKey(slot, KEY_BG_IMAGE_FIT_MODE), getBackgroundImageFitMode(context));
+        editor.putFloat(profileKey(slot, KEY_BG_IMAGE_OFFSET_X), getBackgroundImageOffsetX(context));
+        editor.putFloat(profileKey(slot, KEY_BG_IMAGE_OFFSET_Y), getBackgroundImageOffsetY(context));
+        editor.putFloat(profileKey(slot, KEY_BG_IMAGE_SCALE), getBackgroundImageScale(context));
+        editor.putFloat(profileKey(slot, KEY_RENDER_SCALE), getRenderScale(context));
+        editor.putInt(profileKey(slot, KEY_TARGET_FPS), getTargetFps(context));
+        editor.putBoolean(profileKey(slot, KEY_TOUCH_ENABLED), getTouchEnabled(context));
+        editor.putBoolean(profileKey(slot, KEY_PHYSBONE_ENABLED), getPhysBoneEnabled(context));
+        editor.putInt(profileKey(slot, KEY_LOG_LEVEL), getLogLevel(context));
+        editor.putBoolean(profileKey(slot, KEY_FPS_OVERLAY_ENABLED), getFpsOverlayEnabled(context));
+        editor.putFloat(profileKey(slot, KEY_MODEL_OFFSET_X), getModelOffsetX(context));
+        editor.putFloat(profileKey(slot, KEY_MODEL_OFFSET_Y), getModelOffsetY(context));
+        editor.putFloat(profileKey(slot, KEY_MODEL_OFFSET_Z), getModelOffsetZ(context));
+        editor.putFloat(profileKey(slot, KEY_MODEL_SCALE), getModelScale(context));
         editor.commit();
+    }
+
+    static ProfileSnapshot getProfileSnapshot(Context context, int slot) {
+        if (!hasProfileSlot(context, slot)) {
+            return null;
+        }
+
+        SharedPreferences sharedPreferences = prefs(context);
+        return new ProfileSnapshot(
+                sharedPreferences.getString(profileKey(slot, KEY_VRM_PATH), ""),
+                sharedPreferences.getString(profileKey(slot, KEY_VRM_DISPLAY_NAME), ""),
+                sharedPreferences.getFloat(profileKey(slot, KEY_CAMERA_DISTANCE), 3.0f),
+                sharedPreferences.getFloat(profileKey(slot, KEY_CAMERA_HEIGHT), 0.5f),
+                sharedPreferences.getFloat(profileKey(slot, KEY_CAMERA_ANGLE), 0.0f),
+                sharedPreferences.getFloat(profileKey(slot, KEY_BG_COLOR_R), 0.2f),
+                sharedPreferences.getFloat(profileKey(slot, KEY_BG_COLOR_G), 0.2f),
+                sharedPreferences.getFloat(profileKey(slot, KEY_BG_COLOR_B), 0.2f),
+                sharedPreferences.getInt(profileKey(slot, KEY_BG_MODE), 0),
+                sharedPreferences.getString(profileKey(slot, KEY_BG_IMAGE_PATH), ""),
+                sharedPreferences.getFloat(profileKey(slot, KEY_RENDER_SCALE), 1.0f),
+                sharedPreferences.getInt(profileKey(slot, KEY_TARGET_FPS), 30),
+                sharedPreferences.getFloat(profileKey(slot, KEY_MODEL_OFFSET_X), 0.0f),
+                sharedPreferences.getFloat(profileKey(slot, KEY_MODEL_OFFSET_Y), 0.0f),
+                sharedPreferences.getFloat(profileKey(slot, KEY_MODEL_OFFSET_Z), 0.0f),
+                sharedPreferences.getFloat(profileKey(slot, KEY_MODEL_SCALE), 1.0f));
     }
 
     static boolean loadProfileSlot(Context context, int slot) {

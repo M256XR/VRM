@@ -102,6 +102,9 @@ public class MainActivity extends Activity {
     private TextView modelScaleValueText;
     private TextView modelInfoText;
     private TextView fpsInfoText;
+    private TextView profileSummary1Text;
+    private TextView profileSummary2Text;
+    private TextView profileSummary3Text;
 
     private SeekBar distanceSeekBar;
     private SeekBar heightSeekBar;
@@ -215,6 +218,7 @@ public class MainActivity extends Activity {
 
     private void showSettings() {
         refreshFileLabels();
+        refreshProfileSummaries();
         updateImageAdjustmentVisibility();
         settingsOverlay.setVisibility(View.VISIBLE);
         settingsOverlay.setAlpha(0f);
@@ -450,6 +454,9 @@ public class MainActivity extends Activity {
         modelScaleValueText = findViewById(R.id.vrm_text_model_scale_value);
         modelInfoText = findViewById(R.id.vrm_text_model_info);
         fpsInfoText = findViewById(R.id.vrm_text_fps_info);
+        profileSummary1Text = findViewById(R.id.vrm_text_profile_summary_1);
+        profileSummary2Text = findViewById(R.id.vrm_text_profile_summary_2);
+        profileSummary3Text = findViewById(R.id.vrm_text_profile_summary_3);
 
         colorPreview = findViewById(R.id.vrm_view_color_preview);
         imageAdjustmentPanel = findViewById(R.id.vrm_panel_image_adjustment);
@@ -839,6 +846,7 @@ public class MainActivity extends Activity {
 
         updateColorPreview();
         refreshFileLabels();
+        refreshProfileSummaries();
         updateImageAdjustmentVisibility();
         updateModelInfoLabel(lastModelInfo);
         updateFpsInfoLabel(lastFpsInfo);
@@ -867,6 +875,69 @@ public class MainActivity extends Activity {
             backgroundImagePathText.setText(backgroundImageLabel);
         }
         updateBackgroundModeButtons();
+    }
+
+    private void refreshProfileSummaries() {
+        updateProfileSummary(profileSummary1Text, 1);
+        updateProfileSummary(profileSummary2Text, 2);
+        updateProfileSummary(profileSummary3Text, 3);
+    }
+
+    private void updateProfileSummary(TextView textView, int slot) {
+        if (textView == null) {
+            return;
+        }
+
+        WallpaperPrefs.ProfileSnapshot snapshot = WallpaperPrefs.getProfileSnapshot(this, slot);
+        if (snapshot == null) {
+            textView.setText(R.string.vrm_profile_empty);
+            textView.setTextColor(Color.parseColor("#77FFFFFF"));
+            return;
+        }
+
+        String modelLabel = displayNameOrFileName(snapshot.vrmDisplayName, snapshot.vrmPath,
+                R.string.vrm_no_vrm_selected);
+        String backgroundLabel = snapshot.backgroundMode == 1
+                ? getString(R.string.vrm_profile_background_image,
+                        fileNameOrFallback(snapshot.backgroundImagePath, R.string.vrm_no_image_selected))
+                : getString(R.string.vrm_profile_background_solid,
+                        colorToHex(snapshot.backgroundColorRed, snapshot.backgroundColorGreen, snapshot.backgroundColorBlue));
+
+        String summary = getString(R.string.vrm_profile_summary_model, modelLabel)
+                + "\n" + getString(R.string.vrm_profile_summary_display,
+                backgroundLabel, snapshot.targetFps, formatFloat(snapshot.renderScale))
+                + "\n" + getString(R.string.vrm_profile_summary_camera,
+                formatFloat(snapshot.cameraDistance), formatFloat(snapshot.cameraHeight),
+                getString(R.string.vrm_angle_value_format, Math.round(snapshot.cameraAngle)))
+                + "\n" + getString(R.string.vrm_profile_summary_transform,
+                formatFloat(snapshot.modelOffsetX), formatFloat(snapshot.modelOffsetY),
+                formatFloat(snapshot.modelOffsetZ), formatFloat(snapshot.modelScale));
+
+        textView.setText(summary);
+        textView.setTextColor(Color.parseColor("#CCFFFFFF"));
+    }
+
+    private String displayNameOrFileName(String displayName, String path, int emptyStringId) {
+        if (displayName != null && !displayName.isEmpty()) {
+            return displayName;
+        }
+
+        return fileNameOrFallback(path, emptyStringId);
+    }
+
+    private String fileNameOrFallback(String path, int emptyStringId) {
+        if (path == null || path.isEmpty()) {
+            return getString(emptyStringId);
+        }
+
+        return new File(path).getName();
+    }
+
+    private String colorToHex(float red, float green, float blue) {
+        return String.format(Locale.US, "%02X%02X%02X",
+                colorToProgress(red),
+                colorToProgress(green),
+                colorToProgress(blue));
     }
 
     private void updateBackgroundModeButtons() {
@@ -1124,6 +1195,7 @@ public class MainActivity extends Activity {
 
     private void saveProfile(int slot) {
         WallpaperPrefs.saveProfileSlot(this, slot);
+        refreshProfileSummaries();
         toastText(getString(R.string.vrm_saved_profile_format, slot));
     }
 

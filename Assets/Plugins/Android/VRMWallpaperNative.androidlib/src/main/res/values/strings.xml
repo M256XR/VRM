@@ -48,6 +48,13 @@
     <string name="vrm_fps_info_empty">FPS情報はまだありません</string>
     <string name="vrm_render_scale_hint">低いほど軽く、高いほど輪郭がはっきりします</string>
     <string name="vrm_profile_hint">3スロットに現在のモデル、背景、カメラ、表示設定を保存できます。</string>
+    <string name="vrm_profile_empty">未保存</string>
+    <string name="vrm_profile_summary_model">モデル: %1$s</string>
+    <string name="vrm_profile_summary_display">背景: %1$s / FPS %2$d / 解像度 %3$s</string>
+    <string name="vrm_profile_summary_camera">カメラ: 距離 %1$s 高さ %2$s 角度 %3$s</string>
+    <string name="vrm_profile_summary_transform">位置: X %1$s Y %2$s Z %3$s / サイズ %4$s</string>
+    <string name="vrm_profile_background_solid">単色 #%1$s</string>
+    <string name="vrm_profile_background_image">画像 %1$s</string>
 
     <string name="vrm_label_red">赤</string>
     <string name="vrm_label_green">緑</string>
