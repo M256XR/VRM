@@ -3,7 +3,6 @@
     <string name="vrm_settings_title">設定</string>
     <string name="vrm_icon_settings">⚙</string>
     <string name="vrm_button_toggle_settings">設定を開く</string>
-    <string name="vrm_icon_reload">↻</string>
     <string name="vrm_icon_close">✕</string>
     <string name="vrm_tab_model">モデル</string>
     <string name="vrm_tab_background">背景</string>
@@ -24,7 +23,9 @@
     <string name="vrm_section_actions">操作</string>
 
     <string name="vrm_button_set_wallpaper">ライブ壁紙に設定</string>
-    <string name="vrm_button_reload_wallpaper">壁紙を再読み込み</string>
+    <string name="vrm_button_reload_model">モデルを再読込</string>
+    <string name="vrm_section_troubleshooting">復旧</string>
+    <string name="vrm_reload_hint">モデルや表示が更新されない時だけ使います。通常の設定変更は自動で反映されます。</string>
     <string name="vrm_button_open_preview">プレビューを開く</string>
     <string name="vrm_button_pick_vrm">モデルを選ぶ</string>
     <string name="vrm_button_pick_image">背景画像を選ぶ</string>
@@ -76,7 +77,7 @@
     <string name="vrm_toggle_on">ON</string>
     <string name="vrm_toggle_off">OFF</string>
 
-    <string name="vrm_settings_footer">変更はすぐ反映されます。モデルや背景を変えた後に壁紙を再読み込みしてください。</string>
+    <string name="vrm_settings_footer">変更はすぐ反映されます。</string>
     <string name="vrm_saved_vrm">モデルを保存しました</string>
     <string name="vrm_saved_image">背景画像を保存しました</string>
     <string name="vrm_saved_solid_background">単色背景に切り替えました</string>
@@ -86,7 +87,7 @@
     <string name="vrm_saved_profile_format">プロファイル%1$dに保存しました</string>
     <string name="vrm_loaded_profile_format">プロファイル%1$dを読み込みました</string>
     <string name="vrm_error_profile_not_found_format">プロファイル%1$dは未保存です</string>
-    <string name="vrm_wallpaper_reloaded">壁紙の再読み込みを要求しました</string>
+    <string name="vrm_wallpaper_reloaded">モデルの再読み込みを要求しました</string>
 
     <string name="vrm_error_open_failed">選択したファイルを開けませんでした</string>
     <string name="vrm_error_save_failed">選択したファイルを保存できませんでした</string>

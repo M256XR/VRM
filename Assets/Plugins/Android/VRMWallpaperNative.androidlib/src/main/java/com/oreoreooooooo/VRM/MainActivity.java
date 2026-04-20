@@ -321,7 +321,7 @@ public class MainActivity extends Activity {
 
     private void applyM3UiStyle() {
         styleButton(findViewById(R.id.vrm_button_set_wallpaper), "#7F5AF0", "#FFFFFF", 100.0f);
-        styleButton(findViewById(R.id.vrm_button_reload_wallpaper), "#22FFFFFF", "#FFFFFF", 100.0f);
+        styleButton(findViewById(R.id.vrm_button_reload_wallpaper), "#18FFFFFF", "#F2EEF8", 14.0f);
         styleButton(findViewById(R.id.vrm_button_close_settings), "#00000000", "#BBBBBB", 100.0f);
         styleButton(toggleButton, "#AA161220", "#FFFFFF", 100.0f);
         styleButton(findViewById(R.id.vrm_button_pick_vrm), "#7F5AF0", "#FFFFFF", 100.0f);
@@ -1332,14 +1332,6 @@ public class MainActivity extends Activity {
     }
 
     private void reloadWallpaper() {
-        WallpaperInfo wallpaperInfo = WallpaperManager.getInstance(this).getWallpaperInfo();
-        boolean active = wallpaperInfo != null
-                && WallpaperActivity.class.getName().equals(wallpaperInfo.getServiceName());
-        if (!active) {
-            toast(R.string.vrm_error_wallpaper_not_active);
-            return;
-        }
-
         UnityRuntimeHost.get(this).sendMessage("ReloadVRM", "");
         toast(R.string.vrm_wallpaper_reloaded);
     }
